@@ -4,10 +4,31 @@ const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
 const logoutButton = document.getElementById('logout');
 
-async function api(path, options) {
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Request failed.');
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+
+  const text = await response.text();
+  let data = null;
+
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    if (text.trim().startsWith('<')) {
+      throw new Error(
+        'Nexauren returned a web page instead of an API response. Please refresh and try again.',
+      );
+    }
+    throw new Error('The server returned an invalid response.');
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || 'Request failed.');
+  }
+
   return data;
 }
 
@@ -24,30 +45,38 @@ function renderUser(data) {
 
   guestView.classList.add('hidden');
   userView.classList.remove('hidden');
-  document.getElementById('profile-name').textContent = data.user.name || 'Nexauren member';
+  document.getElementById('profile-name').textContent =
+    data.user.name || 'Nexauren member';
   document.getElementById('profile-email').textContent = data.user.email;
   document.getElementById('profile-role').textContent = data.user.role;
   document.getElementById('credit-balance').textContent = data.credits;
 
   const list = document.getElementById('purchases');
   if (!data.purchases.length) {
-    list.innerHTML = '<div class="purchase"><span>No purchases yet.</span></div>';
+    list.innerHTML =
+      '<div class="purchase"><span>No purchases yet.</span></div>';
     return;
   }
+
   list.innerHTML = data.purchases.map((item) =>
-    `<div class="purchase"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span></div>`
+    `<div class="purchase"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span></div>`,
   ).join('');
 }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;',
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#039;',
+    '"': '&quot;',
   }[char]));
 }
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   showStatus('login-status', 'Signing in…');
+
   try {
     await api('/api/auth/login', {
       method: 'POST',
@@ -67,10 +96,12 @@ loginForm.addEventListener('submit', async (event) => {
 registerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   showStatus('register-status', 'Creating account…');
+
   if (registerForm.password.value !== registerForm.confirm_password.value) {
     showStatus('register-status', 'Passwords do not match.');
     return;
   }
+
   try {
     await api('/api/auth/register', {
       method: 'POST',
@@ -81,6 +112,7 @@ registerForm.addEventListener('submit', async (event) => {
         password: registerForm.password.value,
       }),
     });
+
     showStatus('register-status', 'Account created.');
     await loadAccount();
   } catch (error) {
@@ -89,8 +121,11 @@ registerForm.addEventListener('submit', async (event) => {
 });
 
 logoutButton.addEventListener('click', async () => {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  await loadAccount();
+  try {
+    await api('/api/auth/logout', { method: 'POST' });
+  } finally {
+    await loadAccount();
+  }
 });
 
 async function loadAccount() {
@@ -106,7 +141,10 @@ document.querySelectorAll('.show-credits').forEach((button) => {
   button.addEventListener('click', async () => {
     try {
       const data = await api('/api/account');
-      if (!data.user) return showStatus('login-status', 'Sign in first.');
+      if (!data.user) {
+        showStatus('login-status', 'Sign in first.');
+        return;
+      }
       window.location.href = '/account/?credits=1';
     } catch (error) {
       showStatus('login-status', error.message);
