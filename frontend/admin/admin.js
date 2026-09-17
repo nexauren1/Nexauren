@@ -104,8 +104,9 @@ function renderBookOptions() {
   }
   ['book-context', 'mobile-book-context'].forEach((id) => {
     const select = $(id);
-    if (select) select.innerHTML = options.join('');
-    if (select && state.currentBook) select.value = state.currentBook.id;
+    if (!select) return;
+    select.innerHTML = options.join('');
+    if (state.currentBook) select.value = state.currentBook.id;
   });
 }
 
@@ -159,8 +160,12 @@ function renderBooksList() {
 
   target.querySelectorAll('[data-open-book]').forEach((button) => {
     button.addEventListener('click', async () => {
-      await selectBook(button.dataset.openBook);
-      goTo('dashboard');
+      try {
+        await selectBook(button.dataset.openBook);
+        goTo('dashboard');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      }
     });
   });
 }
@@ -206,17 +211,17 @@ async function loadOverview() {
   $('ai-state').querySelector('span').textContent = ai.configured ? 'Workers AI pronto' : 'Workers AI offline';
 }
 
-function renderObject(value, level = 0) {
+function renderObject(value) {
   if (value === null || value === undefined || value === '') return '';
   if (typeof value !== 'object') return `<p>${escapeHtml(value)}</p>`;
   if (Array.isArray(value)) {
     if (!value.length) return '<p>Sem itens.</p>';
-    return `<ul>${value.map((item) => `<li>${typeof item === 'object' ? renderObject(item, level + 1) : escapeHtml(item)}</li>`).join('')}</ul>`;
+    return `<ul>${value.map((item) => `<li>${typeof item === 'object' ? renderObject(item) : escapeHtml(item)}</li>`).join('')}</ul>`;
   }
   return `<div class="ai-object">${Object.entries(value).map(([key, item]) => `
     <div class="ai-block">
       <h3>${escapeHtml(key.replace(/_/g, ' '))}</h3>
-      ${renderObject(item, level + 1)}
+      ${renderObject(item)}
     </div>
   `).join('')}</div>`;
 }
@@ -231,11 +236,13 @@ function renderBookWorkspace() {
   const book = state.currentBook;
   if (!book) return;
   const bible = book.story_bible || {};
-  const research = (book.research_notes || []).map((row) => {
-    try { return JSON.parse(row.note); } catch { return { note: row.note }; }
-  })[0];
+  const researchRows = book.research_notes || [];
+  let research = null;
+  if (researchRows[0]) {
+    try { research = JSON.parse(researchRows[0].note); } catch { research = { note: researchRows[0].note }; }
+  }
   if (research) renderAi('research-view', research);
-  if (bible.identity || bible.story || bible.characters?.length) renderAi('bible-state', bible);
+  if (Object.keys(bible).length) renderAi('bible-state', bible);
   else $('bible-state').innerHTML = '<div class="empty-state">A Story Bible ainda não foi gerada.</div>';
 
   const canon = book.canonical_facts || [];
@@ -273,14 +280,10 @@ function renderBookWorkspace() {
     </article>
   `).join('') : '<div class="empty">Nenhum capítulo foi gerado ainda.</div>';
 
-  const slug = book.slug;
   $('publication-status').innerHTML = `<span class="eyebrow">ESTADO ATUAL</span><strong>${escapeHtml(book.status)}</strong><p>${book.status === 'published' ? 'O título está visível na Store.' : 'O título ainda não está disponível na Store pública.'}</p>`;
   $('publication-price').value = Number(book.price_usd || 0).toFixed(2);
-
   $('sales-price').textContent = money(book.price_usd, book.currency || 'USD');
-
-  $('file-view').textContent = '';
-  loadFiles(slug).catch(() => {});
+  loadFiles(book.slug).catch(() => {});
   loadSales(book.id).catch(() => {});
   loadCovers(book.id).catch(() => {});
   loadPublicationState(book.id).catch(() => {});
@@ -290,11 +293,11 @@ async function loadFiles(slug) {
   const target = $('files-view');
   if (!target || !state.currentBook) return;
   const data = await api(`/api/admin/files?book_id=${encodeURIComponent(state.currentBook.id)}`);
-  const canUsePublicUrl = state.currentBook.status === 'published';
+  const isPublished = state.currentBook.status === 'published';
   target.innerHTML = `
     <strong>${escapeHtml(data.chapters || 0)} capítulos atuais · geração ${data.generated_on_demand ? 'sob pedido' : 'armazenada'}</strong>
-    <span class="file-note">PDF e EPUB são produzidos a partir do texto do livro quando solicitados. Não é necessário Backblaze B2 para este fluxo.</span>
-    ${canUsePublicUrl ? `<div class="file-links"><a href="/api/books/${encodeURIComponent(slug)}/download?format=pdf">Baixar PDF</a><a href="/api/books/${encodeURIComponent(slug)}/download?format=epub">Baixar EPUB</a></div>` : '<span class="file-note">Publique o livro para habilitar os downloads protegidos de produção.</span>'}
+    <span class="file-note">PDF e EPUB são produzidos a partir do texto do livro quando solicitados. Não é necessário Backblaze B2.</span>
+    ${isPublished ? `<div class="file-links"><a href="/api/books/${encodeURIComponent(slug)}/download?format=pdf">Baixar PDF</a><a href="/api/books/${encodeURIComponent(slug)}/download?format=epub">Baixar EPUB</a></div>` : '<span class="file-note">Publique o livro para habilitar os downloads de produção.</span>'}
   `;
 }
 
@@ -304,13 +307,11 @@ async function loadSales(bookId) {
   $('sales-revenue').textContent = money(data.revenue, data.currency || 'USD');
 }
 
-async function loadPublicationState(bookId) {
-  // The current database keeps the editorial book status as the durable state.
-  // The UI presents the same workflow and avoids inventing a state the schema cannot persist.
+async function loadPublicationState() {
   document.querySelectorAll('.status-button').forEach((button) => {
     button.classList.toggle('active', button.dataset.status === state.currentBook?.status);
   });
-  if ($('publication-status-note')) setInline('publication-status-note', `Estado persistido: ${state.currentBook?.status || 'draft'}.`, 'success');
+  setInline('publication-status-note', `Estado persistido: ${state.currentBook?.status || 'draft'}.`, 'success');
 }
 
 async function loadSeries() {
@@ -338,15 +339,15 @@ async function runAiButton(button) {
       chapter_number: Number($('chapter-number')?.value || 1),
       instructions: $('chapter-instructions')?.value || '',
     });
-    if (action === 'research') renderAi('research-view', data.report);
-    if (action === 'story_bible') renderAi('bible-state', data.bible);
+    if (action === 'research') renderAi('research-view', data.report, 'RESEARCH REPORT');
+    if (action === 'story_bible') renderAi('bible-state', data.bible, 'STORY BIBLE');
     if (action === 'outline') renderAi('bible-state', data.outline, 'OUTLINE');
     if (action === 'chapter') renderAi('chapters-list', data.chapter, `CAPÍTULO ${data.chapter?.title || ''}`);
     if (action === 'story_state') renderAi('world-view', data.state, 'STORY STATE');
-    if (action === 'continuity') renderAi('continuity-view', data.report);
-    if (action === 'qa') renderAi('qa-view', data.qa);
-    if (action === 'originality') renderAi('originality-view', data.originality);
-    if (action === 'seo') renderAi('seo-view', data.seo);
+    if (action === 'continuity') renderAi('continuity-view', data.report, 'CONTINUITY CHECK');
+    if (action === 'qa') renderAi('qa-view', data.qa, 'BOOK QA');
+    if (action === 'originality') renderAi('originality-view', data.originality, 'ORIGINALITY CHECK');
+    if (action === 'seo') renderAi('seo-view', data.seo, 'SEO');
     await selectBook(state.currentBook.id, false);
     await loadOverview();
     setStatus(`Workers AI concluiu: ${action}.`, 'success');
@@ -355,6 +356,22 @@ async function runAiButton(button) {
   } finally {
     finish();
   }
+}
+
+async function createBook() {
+  const form = $('book-form');
+  if (!form) throw new Error('Formulário do livro não encontrado.');
+  const body = formObject(form);
+  if (!String(body.title || '').trim()) throw new Error('O título do livro é obrigatório.');
+  const data = await api('/api/admin/books', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  await loadBooks();
+  await selectBook(data.id, false);
+  form.reset();
+  setInline('book-form-status', `Projeto criado: ${body.title}.`, 'success');
+  return data;
 }
 
 async function registryCheck() {
@@ -410,7 +427,7 @@ async function loadCovers(bookId) {
   }
   target.innerHTML = data.items.map((cover) => `
     <article class="cover-card">
-      <img class="cover-image" alt="Capa gerada" loading="lazy" src="/api/books/${encodeURIComponent(bookId)}/cover?cover=${encodeURIComponent(cover.id)}">
+      <div class="cover-image cover-generated-placeholder">${Number(cover.selected) ? 'Selecionada' : 'Gerada'}</div>
       <p>${escapeHtml(cover.model)} · ${Number(cover.selected) ? 'Selecionada' : 'Não selecionada'}</p>
       ${Number(cover.selected) ? '' : `<button class="secondary-button" type="button" data-select-cover="${escapeHtml(cover.id)}">Escolher esta</button>`}
     </article>
@@ -441,23 +458,24 @@ async function savePublication() {
     method: 'PATCH',
     body: JSON.stringify({ status, price_usd: price }),
   });
-  await selectBook(state.currentBook.id, false);
   await loadBooks();
+  await selectBook(state.currentBook.id, false);
   await loadOverview();
   setInline('publication-status-note', `Guardado: ${state.currentBook.status}.`, 'success');
 }
 
 async function refreshSection(section) {
-  if (section === 'books') renderBooksList();
   if (!state.currentBook && !['dashboard', 'books', 'create', 'series', 'settings'].includes(section)) {
     setStatus('Selecione um livro antes de abrir este módulo.', 'error');
     return;
   }
   try {
     if (section === 'dashboard') await loadOverview();
-    if (section === 'books') await loadBooks();
+    if (section === 'books') renderBooksList();
     if (section === 'series') await loadSeries();
-    if (['bible', 'characters', 'world', 'timeline', 'chapters', 'files', 'publication', 'sales', 'continuity', 'qa', 'originality', 'covers', 'seo'].includes(section)) renderBookWorkspace();
+    if (['bible', 'characters', 'world', 'timeline', 'chapters', 'files', 'publication', 'sales', 'continuity', 'qa', 'originality', 'covers', 'seo'].includes(section)) {
+      renderBookWorkspace();
+    }
     if (section === 'settings') {
       const data = await api('/api/admin/settings');
       $('settings-view').innerHTML = `
@@ -500,27 +518,23 @@ $('book-form')?.addEventListener('submit', async (event) => {
   const button = event.currentTarget.querySelector('button[type="submit"]');
   const finish = setButtonBusy(button, true, 'A guardar…');
   try {
-    const body = formObject(event.currentTarget);
-    const data = await api('/api/admin/books', { method: 'POST', body: JSON.stringify(body) });
-    await loadBooks();
-    await selectBook(data.id, false);
-    setInline('book-form-status', `Projeto criado: ${body.title}.`, 'success');
+    await createBook();
     goTo('dashboard');
   } catch (error) {
     setInline('book-form-status', error.message, 'error');
   } finally { finish(); }
 });
 
-$('create-and-research')?.addEventListener('click', async () => {
-  $('book-form').requestSubmit();
-  setTimeout(async () => {
-    try {
-      if (!state.currentBook) return;
-      goTo('bible');
-      const button = document.querySelector('[data-ai="research"]');
-      if (button) await runAiButton(button);
-    } catch (error) { setStatus(error.message, 'error'); }
-  }, 350);
+$('create-and-research')?.addEventListener('click', async (event) => {
+  const finish = setButtonBusy(event.currentTarget, true, 'A criar + analisar…');
+  try {
+    await createBook();
+    goTo('bible');
+    const button = document.querySelector('[data-ai="research"]');
+    if (button) await runAiButton(button);
+  } catch (error) {
+    setInline('book-form-status', error.message, 'error');
+  } finally { finish(); }
 });
 
 $('series-form')?.addEventListener('submit', async (event) => {
@@ -584,6 +598,7 @@ document.querySelectorAll('.status-button').forEach((button) => {
     setInline('publication-status-note', `Novo estado selecionado: ${button.dataset.status}.`, '');
   });
 });
+
 $('save-publication')?.addEventListener('click', async () => {
   try { await savePublication(); } catch (error) { setInline('publication-status-note', error.message, 'error'); }
 });
@@ -599,7 +614,7 @@ $('logout')?.addEventListener('click', async () => {
     if (!user) return;
     await Promise.all([loadOverview(), loadBooks()]);
     setStatus(`Ligado como ${user.email}. Books Studio está pronto.`, 'success');
-  } catch (error) {
+  } catch {
     window.location.replace('/admin/login/');
   }
 })();
