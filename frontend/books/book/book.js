@@ -13,12 +13,19 @@ const formats = document.querySelector('.detail-grid .detail:nth-child(3) p');
 const preview = document.querySelector('.detail-grid .detail:nth-child(4) p');
 
 function money(value, currency = 'USD') {
-  return Number(value || 0).toLocaleString('en-US', { style: 'currency', currency });
+  return Number(value || 0).toLocaleString('en-US', {
+    style: 'currency',
+    currency,
+  });
 }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;',
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#039;',
+    '"': '&quot;',
   }[char]));
 }
 
@@ -27,10 +34,39 @@ function setError(message) {
 }
 
 async function api(path, options) {
-  const response = await fetch(path, options);
-  const data = await response.json();
+  const response = await fetch(path, {
+    credentials: 'same-origin',
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options?.headers || {}),
+    },
+  });
+  const text = await response.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { throw new Error(`Server returned an invalid response (${response.status}).`); }
   if (!response.ok) throw new Error(data.error || 'Request failed.');
   return data;
+}
+
+function addDownloadButtons(slugValue, formatsValue) {
+  const purchaseBox = document.querySelector('.purchase-box');
+  if (!purchaseBox) return;
+  const host = document.createElement('div');
+  host.className = 'download-actions';
+  const available = formatsValue || ['pdf', 'epub'];
+  host.innerHTML = available.map((format) => `
+    <a class="book-button soft" href="/api/books/${encodeURIComponent(slugValue)}/download?format=${encodeURIComponent(format)}">Download ${escapeHtml(format.toUpperCase())}</a>
+  `).join('');
+  purchaseBox.appendChild(host);
+}
+
+function showPurchaseState(message, kind = '') {
+  const box = document.createElement('p');
+  box.className = `placeholder-note ${kind}`.trim();
+  box.textContent = message;
+  document.querySelector('.purchase-box')?.appendChild(box);
 }
 
 function loadPaypal(clientId) {
@@ -48,10 +84,16 @@ async function renderBook(book) {
   document.title = `${book.title} — Nexauren Books`;
   title.textContent = book.title;
   lead.textContent = book.description || book.premise || 'A Nexauren Books digital title.';
-  price.textContent = book.product ? money(book.product.price_usd, book.product.currency) : money(book.price_usd, book.currency);
+  price.textContent = Number(book.price_usd || 0) > 0
+    ? money(book.price_usd, book.currency)
+    : 'Free';
   author.textContent = book.author || 'Nexauren';
   description.textContent = book.description || 'Description will be updated by the Books publishing workspace.';
-  formats.textContent = [book.pdf_available ? 'PDF' : null, book.epub_available ? 'EPUB' : null].filter(Boolean).join(' · ') || 'Digital format pending';
+  const availableFormats = [
+    book.pdf_available ? 'pdf' : null,
+    book.epub_available ? 'epub' : null,
+  ].filter(Boolean);
+  formats.textContent = availableFormats.map((item) => item.toUpperCase()).join(' · ') || 'Digital format pending';
   preview.textContent = book.preview_url ? 'Preview available.' : 'Preview will be added when provided.';
   metaRow.innerHTML = [book.genre, book.language, book.age_rating, formats.textContent]
     .filter(Boolean).map((item) => `<span class="meta">${escapeHtml(item)}</span>`).join('');
@@ -65,31 +107,47 @@ async function renderBook(book) {
 
   const purchaseBox = document.querySelector('.purchase-box');
   if (!book.product) {
-    note.textContent = 'This title is not configured as a purchasable product yet.';
+    note.textContent = Number(book.price_usd || 0) > 0
+      ? 'This title is not configured as a purchasable product yet.'
+      : 'This title is available as a free digital edition.';
+    if (Number(book.price_usd || 0) <= 0) addDownloadButtons(slug, availableFormats);
     return;
   }
 
-  note.innerHTML = 'Sign in is required before checkout. Payment is confirmed server-side through PayPal.';
-  const buttonHost = document.createElement('div');
-  buttonHost.id = 'paypal-button-container';
-  buttonHost.style.marginTop = '14px';
-  purchaseBox.appendChild(buttonHost);
-
   const account = await api('/api/account');
+  const hasPurchase = Boolean(
+    account.user
+    && (account.purchases || []).some((item) => item.product_id === book.product.id && item.status === 'ACTIVE'),
+  );
+
+  if (hasPurchase) {
+    note.textContent = 'Purchase confirmed. Your digital editions are ready.';
+    addDownloadButtons(slug, availableFormats);
+    return;
+  }
+
   if (!account.user) {
+    note.textContent = 'Sign in is required before checkout.';
     const signIn = document.createElement('a');
     signIn.className = 'book-button soft';
     signIn.href = '../../account/';
-    signIn.textContent = 'Sign in to buy';
-    buttonHost.replaceWith(signIn);
+    signIn.textContent = Number(book.price_usd || 0) > 0 ? 'Sign in to buy' : 'Sign in';
+    purchaseBox.appendChild(signIn);
+    if (Number(book.price_usd || 0) <= 0) addDownloadButtons(slug, availableFormats);
     return;
   }
 
   const config = await api('/api/paypal/config');
   if (!config.configured) {
-    buttonHost.innerHTML = '<p class="placeholder-note">PayPal is not configured on the Worker yet.</p>';
+    note.textContent = 'Checkout will appear when PayPal is connected to the Worker.';
     return;
   }
+
+  note.textContent = 'Secure checkout through PayPal. Payment is confirmed server-side.';
+  const buttonHost = document.createElement('div');
+  buttonHost.id = 'paypal-button-container';
+  buttonHost.style.marginTop = '14px';
+  purchaseBox.appendChild(buttonHost);
 
   const paypal = await loadPaypal(config.client_id);
   paypal.Buttons({
@@ -97,7 +155,6 @@ async function renderBook(book) {
     async createOrder() {
       const data = await api('/api/paypal/create-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ product_id: book.product.id }),
       });
       return data.id;
@@ -106,14 +163,12 @@ async function renderBook(book) {
       note.textContent = 'Confirming your payment…';
       await api('/api/paypal/capture-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_id: data.orderID }),
       });
       note.textContent = 'Payment completed. Your purchase is now attached to your Nexauren account.';
+      addDownloadButtons(slug, availableFormats);
     },
-    onCancel() {
-      note.textContent = 'Checkout cancelled.';
-    },
+    onCancel() { note.textContent = 'Checkout cancelled.'; },
     onError(error) {
       console.error(error);
       note.textContent = 'PayPal could not complete this checkout.';
