@@ -44,14 +44,6 @@ function base64ToBytes(value) {
   return bytes;
 }
 
-function bytesToBase64(bytes) {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
 async function sha256(value) {
   const data = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -124,7 +116,6 @@ async function createSession(env, userId) {
 async function getSession(env, request) {
   const token = parseCookies(request)[SESSION_COOKIE];
   if (!token) return null;
-
   const tokenHash = await sha256(token);
   const session = await env.DB.prepare(
     `SELECT s.id, s.user_id, s.expires_at,
@@ -134,19 +125,15 @@ async function getSession(env, request) {
       WHERE s.id = ?
       LIMIT 1`,
   ).bind(tokenHash).first();
-
   if (!session) return null;
-
   if (Number(session.expires_at) <= now()) {
     await env.DB.prepare('DELETE FROM sessions WHERE id = ?')
       .bind(tokenHash).run();
     return null;
   }
-
   await env.DB.prepare(
     'UPDATE sessions SET last_seen_at = ? WHERE id = ?',
   ).bind(now(), tokenHash).run();
-
   return session;
 }
 
@@ -211,23 +198,19 @@ async function authRegister(env, request) {
   const email = cleanEmail(body?.email);
   const password = String(body?.password || '');
   const name = String(body?.name || '').trim().slice(0, 80);
-
   if (!validEmail(email)) return json({ error: 'Enter a valid email.' }, 400);
   if (password.length < 8) {
     return json({ error: 'Password must contain at least 8 characters.' }, 400);
   }
-
   const existing = await env.DB.prepare(
     'SELECT id FROM users WHERE email = ? LIMIT 1',
   ).bind(email).first();
   if (existing) {
     return json({ error: 'An account with this email already exists.' }, 409);
   }
-
   const id = randomId('usr');
   const passwordData = await hashPassword(password);
   const createdAt = now();
-
   await env.DB.prepare(
     `INSERT INTO users
       (id, email, password_hash, password_salt, name, role, created_at)
@@ -240,7 +223,6 @@ async function authRegister(env, request) {
     name || null,
     createdAt,
   ).run();
-
   const session = await createSession(env, id);
   return json(
     { user: { id, email, name: name || null, role: 'user' } },
@@ -253,35 +235,26 @@ async function authLogin(env, request) {
   const body = await bodyJson(request);
   const email = cleanEmail(body?.email);
   const password = String(body?.password || '');
-
   if (!validEmail(email) || !password) {
     return json({ error: 'Email and password are required.' }, 400);
   }
-
   const user = await env.DB.prepare(
     `SELECT id, email, password_hash, password_salt, name, role
-       FROM users
-      WHERE email = ?
-      LIMIT 1`,
+       FROM users WHERE email = ? LIMIT 1`,
   ).bind(email).first();
-
   if (!user) return json({ error: 'Invalid email or password.' }, 401);
-
   const candidate = await hashPassword(password, user.password_salt);
   if (candidate.hash !== user.password_hash) {
     return json({ error: 'Invalid email or password.' }, 401);
   }
-
   const session = await createSession(env, user.id);
   return json(
-    {
-      user: {
+    { user: {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
-      },
-    },
+      } },
     200,
     { 'Set-Cookie': sessionCookie(session.token) },
   );
@@ -294,46 +267,38 @@ async function authLogout(env, request) {
     await env.DB.prepare('DELETE FROM sessions WHERE id = ?')
       .bind(tokenHash).run();
   }
-
-  return json(
-    { ok: true },
-    200,
-    { 'Set-Cookie': sessionCookie('', 0) },
-  );
+  return json({ ok: true }, 200, {
+    'Set-Cookie': sessionCookie('', 0),
+  });
 }
 
 async function getBook(env, bookId) {
   const book = await env.BOOKS_DB.prepare(
-    `SELECT * FROM books WHERE id = ? LIMIT 1`,
+    'SELECT * FROM books WHERE id = ? LIMIT 1',
   ).bind(bookId).first();
   if (!book) return null;
-
   const bible = await env.BOOKS_DB.prepare(
-    `SELECT * FROM story_bibles WHERE book_id = ? LIMIT 1`,
+    'SELECT * FROM story_bibles WHERE book_id = ? LIMIT 1',
   ).bind(bookId).first();
-
   const state = await env.BOOKS_DB.prepare(
-    `SELECT * FROM story_states WHERE book_id = ? LIMIT 1`,
+    'SELECT * FROM story_states WHERE book_id = ? LIMIT 1',
   ).bind(bookId).first();
-
   return {
     ...book,
-    story_bible: bible
-      ? {
-          identity: safeJsonParse(bible.identity_json),
-          world: safeJsonParse(bible.world_json),
-          characters: safeJsonParse(bible.characters_json, []),
-          relations: safeJsonParse(bible.relations_json),
-          story: safeJsonParse(bible.story_json),
-          timeline: safeJsonParse(bible.timeline_json, []),
-          outline: safeJsonParse(bible.chapters_json, []),
-          style: safeJsonParse(bible.style_json),
-          continuity: safeJsonParse(bible.continuity_json),
-          continuation: safeJsonParse(bible.continuation_json),
-          canon_locked: Boolean(bible.canon_locked),
-          version: bible.version,
-        }
-      : null,
+    story_bible: bible ? {
+      identity: safeJsonParse(bible.identity_json),
+      world: safeJsonParse(bible.world_json),
+      characters: safeJsonParse(bible.characters_json, []),
+      relations: safeJsonParse(bible.relations_json, []),
+      story: safeJsonParse(bible.story_json),
+      timeline: safeJsonParse(bible.timeline_json, []),
+      outline: safeJsonParse(bible.chapters_json, []),
+      style: safeJsonParse(bible.style_json),
+      continuity: safeJsonParse(bible.continuity_json),
+      continuation: safeJsonParse(bible.continuation_json),
+      canon_locked: Boolean(bible.canon_locked),
+      version: bible.version,
+    } : null,
     story_state: state ? safeJsonParse(state.state_json) : null,
   };
 }
@@ -356,22 +321,17 @@ async function getBookContext(env, bookId) {
   const [chapters, facts, research] = await Promise.all([
     getBookChapters(env, bookId),
     env.BOOKS_DB.prepare(
-      `SELECT id, fact_key, fact_value, immutable, version, reason,
-              created_at, updated_at
-         FROM canonical_facts
-        WHERE book_id = ?
-        ORDER BY fact_key ASC`,
+      `SELECT id, fact_key, fact_value, immutable, version,
+              reason, created_at, updated_at
+         FROM canonical_facts WHERE book_id = ? ORDER BY fact_key`,
     ).bind(bookId).all(),
     env.BOOKS_DB.prepare(
       `SELECT id, title, note, source, where_used, provenance_json,
               created_at, updated_at
-         FROM research_notes
-        WHERE book_id = ?
-        ORDER BY created_at DESC
-        LIMIT 50`,
+         FROM research_notes WHERE book_id = ?
+        ORDER BY created_at DESC LIMIT 50`,
     ).bind(bookId).all(),
   ]);
-
   return {
     ...book,
     chapters,
@@ -418,15 +378,9 @@ const RESEARCH_SCHEMA = {
     verification_notes: { type: 'array', items: { type: 'string' } },
   },
   required: [
-    'concept',
-    'relevant_references',
-    'historical_context',
-    'geographic_context',
-    'cultural_elements',
-    'possible_problems',
-    'similar_ideas',
-    'important_terms',
-    'unresolved_questions',
+    'concept', 'relevant_references', 'historical_context',
+    'geographic_context', 'cultural_elements', 'possible_problems',
+    'similar_ideas', 'important_terms', 'unresolved_questions',
     'verification_notes',
   ],
 };
@@ -445,15 +399,8 @@ const STORY_BIBLE_SCHEMA = {
     continuation: { type: 'object', additionalProperties: true },
   },
   required: [
-    'identity',
-    'story',
-    'characters',
-    'relations',
-    'world',
-    'timeline',
-    'style',
-    'continuity',
-    'continuation',
+    'identity', 'story', 'characters', 'relations', 'world',
+    'timeline', 'style', 'continuity', 'continuation',
   ],
 };
 
@@ -465,7 +412,10 @@ const OUTLINE_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: true,
-        required: ['number', 'title', 'objective', 'characters', 'location', 'conflict', 'result'],
+        required: [
+          'number', 'title', 'objective', 'characters',
+          'location', 'conflict', 'result',
+        ],
         properties: {
           number: { type: 'integer' },
           title: { type: 'string' },
@@ -500,7 +450,10 @@ const STORY_STATE_SCHEMA = {
     open_threads: { type: 'array', items: { type: 'string' } },
     current_events: { type: 'array', items: { type: 'string' } },
   },
-  required: ['characters', 'objects', 'knowledge', 'open_threads', 'current_events'],
+  required: [
+    'characters', 'objects', 'knowledge',
+    'open_threads', 'current_events',
+  ],
 };
 
 const CONTINUITY_SCHEMA = {
@@ -561,17 +514,9 @@ const SEO_SCHEMA = {
     tags: { type: 'array', items: { type: 'string' } },
   },
   required: [
-    'slug',
-    'meta_title',
-    'meta_description',
-    'keywords',
-    'short_description',
-    'full_description',
-    'og_title',
-    'og_description',
-    'social_text',
-    'categories',
-    'tags',
+    'slug', 'meta_title', 'meta_description', 'keywords',
+    'short_description', 'full_description', 'og_title',
+    'og_description', 'social_text', 'categories', 'tags',
   ],
 };
 
@@ -579,7 +524,6 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
   if (!env.AI) {
     throw new Error('Workers AI binding is not configured on this Worker.');
   }
-
   const jobId = randomId('job');
   const started = now();
   await env.BOOKS_DB.prepare(
@@ -599,28 +543,23 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         json_schema: schema,
       },
     });
-
     let response = result?.response ?? result;
-    if (typeof response === 'string') {
-      response = JSON.parse(response);
-    }
+    if (typeof response === 'string') response = JSON.parse(response);
 
-    const generationId = randomId('gen');
-    const createdAt = now();
     await env.BOOKS_DB.prepare(
       `INSERT INTO ai_generations
-        (id, job_id, book_id, action, model, input_json, output_json,
-         created_at, created_by)
+        (id, job_id, book_id, action, model, input_json,
+         output_json, created_at, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
-      generationId,
+      randomId('gen'),
       jobId,
       bookId || null,
       action,
       TEXT_MODEL,
       JSON.stringify({ system, user: clip(user, 50000) }),
       JSON.stringify(response),
-      createdAt,
+      now(),
       adminId,
     ).run();
 
@@ -629,7 +568,6 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           SET status = 'completed', completed_at = ?, error = NULL
         WHERE id = ?`,
     ).bind(now(), jobId).run();
-
     return response;
   } catch (error) {
     await env.BOOKS_DB.prepare(
@@ -644,8 +582,8 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
 async function saveResearch(env, bookId, report) {
   await env.BOOKS_DB.prepare(
     `INSERT INTO research_notes
-      (id, book_id, title, note, source, where_used, provenance_json,
-       created_at, updated_at)
+      (id, book_id, title, note, source, where_used,
+       provenance_json, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     randomId('research'),
@@ -712,13 +650,10 @@ async function saveChapter(env, bookId, chapterNumber, chapter, adminId, instruc
       WHERE book_id = ? AND chapter_number = ?`,
   ).bind(bookId, chapterNumber).first();
   const versionNumber = Number(latest?.version || 0) + 1;
-
   await env.BOOKS_DB.prepare(
-    `UPDATE chapter_versions
-        SET is_current = 0
+    `UPDATE chapter_versions SET is_current = 0
       WHERE book_id = ? AND chapter_number = ?`,
   ).bind(bookId, chapterNumber).run();
-
   await env.BOOKS_DB.prepare(
     `INSERT INTO chapter_versions
       (id, book_id, chapter_number, version_number, title, content,
@@ -739,15 +674,13 @@ async function saveChapter(env, bookId, chapterNumber, chapter, adminId, instruc
     now(),
     adminId,
   ).run();
-
   await env.BOOKS_DB.prepare(
     `UPDATE books SET status = 'writing', updated_at = ? WHERE id = ?`,
   ).bind(now(), bookId).run();
-
   return { version: versionNumber };
 }
 
-async function saveStoryState(env, bookId, chapterNumber, state, adminId) {
+async function saveStoryState(env, bookId, chapterNumber, state) {
   await env.BOOKS_DB.prepare(
     `INSERT INTO story_states
       (id, book_id, chapter_number, state_json, created_at, updated_at)
@@ -764,8 +697,7 @@ async function saveStoryState(env, bookId, chapterNumber, state, adminId) {
     now(),
     now(),
   ).run();
-
-  return { ok: true, updated_by: adminId };
+  return { ok: true };
 }
 
 function normalizeTokens(value) {
@@ -794,10 +726,8 @@ async function semanticCandidates(env, bookId, entityType, name, metadata) {
     `SELECT id, canonical_name, aliases_json, metadata_json
        FROM entity_registry
       WHERE entity_type = ? AND book_id != ?
-      ORDER BY updated_at DESC
-      LIMIT 200`,
+      ORDER BY updated_at DESC LIMIT 200`,
   ).bind(entityType, bookId).all();
-
   const target = `${name} ${JSON.stringify(metadata || {})}`;
   const candidates = (local.results || [])
     .map((item) => {
@@ -811,7 +741,6 @@ async function semanticCandidates(env, bookId, entityType, name, metadata) {
     .filter((item) => item.score >= 0.25)
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
-
   return {
     candidates,
     vectorize_enabled: Boolean(env.BOOKS_VECTORIZE),
@@ -823,12 +752,9 @@ async function adminAI(request, env, admin) {
   const body = await bodyJson(request);
   const action = String(body?.action || '').trim();
   const bookId = String(body?.book_id || '').trim();
-
-  const needsBook = action !== 'health';
-  if (needsBook && !bookId) {
+  if (action !== 'health' && !bookId) {
     return json({ error: 'Select a book first.' }, 400);
   }
-
   if (action === 'health') {
     return json({
       configured: Boolean(env.AI),
@@ -837,10 +763,8 @@ async function adminAI(request, env, admin) {
       vectorize: Boolean(env.BOOKS_VECTORIZE),
     });
   }
-
   const context = await getBookContext(env, bookId);
   if (!context) return json({ error: 'Book not found.' }, 404);
-
   const base = bookTitlePrompt(context);
 
   if (action === 'research') {
@@ -848,7 +772,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Researcher. Analyze a book idea before creative canon is created. Produce a research draft, not a definitive fact database. Separate likely references from items that require human verification. Never silently convert research into canon. Return only JSON matching the requested schema.`,
+      'You are the NexaurenBooks Researcher. Analyze a book idea before creative canon is created. Produce a research draft, not a definitive fact database. Separate likely references from items that require human verification. Never silently convert research into canon. Return only JSON matching the schema.',
       `${base}\n\nResearch stage requirement: identify relevant context, references, possible factual risks, similar ideas and questions that must be resolved.`,
       RESEARCH_SCHEMA,
       admin.user_id,
@@ -866,7 +790,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Story Architect, Character Designer and World Builder. Build a structured Story Bible from the author's idea and the research draft. Research is advisory, not canon. Use stable IDs such as char_kael_01 and loc_porto_01. Keep every field explicit enough for later continuity checks. Never invent a citation. Return only JSON matching the schema.`,
+      'You are the NexaurenBooks Story Architect, Character Designer and World Builder. Build a structured Story Bible from the author idea and research draft. Research is advisory, not canon. Use stable IDs such as char_kael_01 and loc_porto_01. Keep every field explicit enough for later continuity checks. Never invent a citation. Return only JSON matching the schema.',
       `${base}\n\nResearch draft (not canon):\n${clip(research, 24000)}\n\nCreate the Story Bible now.`,
       STORY_BIBLE_SCHEMA,
       admin.user_id,
@@ -883,7 +807,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Outline Planner. Use the current Story Bible as the source of truth. Create a chapter-by-chapter outline that can be approved before prose is generated. Never contradict locked canon. Return only JSON matching the schema.`,
+      'You are the NexaurenBooks Outline Planner. Use the current Story Bible as the source of truth. Create a chapter-by-chapter outline that can be approved before prose is generated. Never contradict locked canon. Return only JSON matching the schema.',
       `Story Bible:\n${clip(context.story_bible, 30000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Produce a coherent outline.`,
       OUTLINE_SCHEMA,
       admin.user_id,
@@ -898,17 +822,19 @@ async function adminAI(request, env, admin) {
       (item) => Number(item.number) === chapterNumber,
     );
     const currentChapter = context.chapters.find(
-      (item) => Number(item.chapter_number) === chapterNumber && Number(item.is_current) === 1,
+      (item) => Number(item.chapter_number) === chapterNumber
+        && Number(item.is_current) === 1,
     );
     const previous = context.chapters.filter(
-      (item) => Number(item.chapter_number) < chapterNumber && Number(item.is_current) === 1,
+      (item) => Number(item.chapter_number) < chapterNumber
+        && Number(item.is_current) === 1,
     ).slice(-2);
     const instructions = String(body?.instructions || '').trim();
     const chapter = await runAIJson(
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Writer. Generate one chapter only. The Story Bible and locked canonical facts are authoritative. Follow the outline and Story State. Do not change names, ages, relationships, world rules, chronology or knowledge states. Never write future canon into the chapter simply because it would be convenient. Return only JSON.`,
+      'You are the NexaurenBooks Writer. Generate one chapter only. The Story Bible and locked canonical facts are authoritative. Follow the outline and Story State. Do not change names, ages, relationships, world rules, chronology or knowledge states. Never write future canon into the chapter simply because it would be convenient. Return only JSON.',
       `Story Bible:\n${clip(context.story_bible, 26000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nRelevant previous chapters:\n${clip(previous, 18000)}\n\nCurrent outline:\n${clip(requestedOutline || {}, 9000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 10000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber}.`,
       CHAPTER_SCHEMA,
       admin.user_id,
@@ -927,33 +853,35 @@ async function adminAI(request, env, admin) {
   if (action === 'story_state') {
     const chapterNumber = Math.max(1, Number(body?.chapter_number || 1));
     const chapter = context.chapters.find(
-      (item) => Number(item.chapter_number) === chapterNumber && Number(item.is_current) === 1,
+      (item) => Number(item.chapter_number) === chapterNumber
+        && Number(item.is_current) === 1,
     );
     if (!chapter) return json({ error: 'Generate or select a current chapter first.' }, 400);
     const state = await runAIJson(
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Story State Manager. Read the current chapter against the Story Bible and canonical facts. Record only state changes supported by the chapter. Do not invent future facts. Return only JSON.`,
+      'You are the NexaurenBooks Story State Manager. Read the current chapter against the Story Bible and canonical facts. Record only state changes supported by the chapter. Do not invent future facts. Return only JSON.',
       `Story Bible:\n${clip(context.story_bible, 22000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 10000)}\n\nPrevious Story State:\n${clip(context.story_state || {}, 12000)}\n\nChapter ${chapterNumber}:\n${clip(chapter.content, 30000)}`,
       STORY_STATE_SCHEMA,
       admin.user_id,
     );
-    await saveStoryState(env, bookId, chapterNumber, state, admin.user_id);
+    await saveStoryState(env, bookId, chapterNumber, state);
     return json({ ok: true, action, state });
   }
 
   if (action === 'continuity') {
     const chapterNumber = Math.max(1, Number(body?.chapter_number || 1));
     const chapter = context.chapters.find(
-      (item) => Number(item.chapter_number) === chapterNumber && Number(item.is_current) === 1,
+      (item) => Number(item.chapter_number) === chapterNumber
+        && Number(item.is_current) === 1,
     );
     if (!chapter) return json({ error: 'Current chapter not found.' }, 400);
     const report = await runAIJson(
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Continuity Checker. Verify names, ages, locations, presence, knowledge, objects, relationships, chronology, repeated events and established characteristics. Compare against Story Bible, canonical facts and current Story State. Report concrete problems and counts. Never declare a problem solved without evidence.`,
+      'You are the NexaurenBooks Continuity Checker. Verify names, ages, locations, presence, knowledge, objects, relationships, chronology, repeated events and established characteristics. Compare against Story Bible, canonical facts and current Story State. Report concrete problems and counts. Never declare a problem solved without evidence.',
       `Story Bible:\n${clip(context.story_bible, 24000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nChapter ${chapterNumber}:\n${clip(chapter.content, 32000)}`,
       CONTINUITY_SCHEMA,
       admin.user_id,
@@ -978,7 +906,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Publication QA Agent. Evaluate whether this book is ready for publication. Check Story Bible, Characters, Timeline, Chapters, Continuity, Grammar/Style at a high level, Ending, Metadata and available digital formats. A critical issue must block publication. Return JSON only.`,
+      'You are the NexaurenBooks Publication QA Agent. Evaluate whether this book is ready for publication. Check Story Bible, Characters, Timeline, Chapters, Continuity, Grammar/Style at a high level, Ending, Metadata and available digital formats. A critical issue must block publication. Return JSON only.',
       `Book:\n${clip(context, 50000)}\n\nEvaluate publication readiness.`,
       QA_SCHEMA,
       admin.user_id,
@@ -1000,7 +928,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Originality Checker. Compare the current concept and text against the provided Nexauren Books catalogue sample. Never state that a work is 100% original. Describe meaningful similarities and the limits of the check. Return JSON only.`,
+      'You are the NexaurenBooks Originality Checker. Compare the current concept and text against the provided Nexauren Books catalogue sample. Never state that a work is 100% original. Describe meaningful similarities and the limits of the check. Return JSON only.',
       `Current book:\n${clip(context, 35000)}\n\nNexauren Books catalogue sample:\n${clip(catalog.results || [], 16000)}\n\nReturn a careful comparison report.`,
       ORIGINALITY_SCHEMA,
       admin.user_id,
@@ -1009,7 +937,13 @@ async function adminAI(request, env, admin) {
       `INSERT INTO originality_checks
         (id, book_id, stage, result_json, created_at, created_by)
        VALUES (?, ?, 'full', ?, ?, ?)`,
-    ).bind(randomId('originality'), bookId, JSON.stringify(originality), now(), admin.user_id).run();
+    ).bind(
+      randomId('originality'),
+      bookId,
+      JSON.stringify(originality),
+      now(),
+      admin.user_id,
+    ).run();
     return json({ ok: true, action, originality });
   }
 
@@ -1018,7 +952,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      `You are the NexaurenBooks Metadata and SEO Agent. Create accurate, non-clickbait metadata based only on the book context. Return JSON only.`,
+      'You are the NexaurenBooks Metadata and SEO Agent. Create accurate, non-clickbait metadata based only on the book context. Return JSON only.',
       `Book context:\n${clip(context, 42000)}\n\nGenerate publication SEO metadata.`,
       SEO_SCHEMA,
       admin.user_id,
@@ -1026,7 +960,8 @@ async function adminAI(request, env, admin) {
     await env.BOOKS_DB.prepare(
       `UPDATE books
           SET slug = ?, seo_title = ?, seo_description = ?,
-              seo_keywords = ?, description = COALESCE(NULLIF(?, ''), description),
+              seo_keywords = ?,
+              description = COALESCE(NULLIF(?, ''), description),
               updated_at = ?
         WHERE id = ?`,
     ).bind(
@@ -1072,32 +1007,27 @@ async function adminAI(request, env, admin) {
 async function adminApi(request, env) {
   const admin = await requireAdmin(env, request);
   if (!admin) return json({ error: 'Admin access required.' }, 403);
-
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
 
   if (path === '/api/admin/overview' && method === 'GET') {
-    const [books, published, drafts, review, users, orders, tools, posts] =
-      await Promise.all([
-        env.BOOKS_DB.prepare('SELECT COUNT(*) AS total FROM books').first(),
-        env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status = 'published'").first(),
-        env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status IN ('draft','research','planning','writing')").first(),
-        env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status = 'review'").first(),
-        env.DB.prepare('SELECT COUNT(*) AS total FROM users').first(),
-        env.DB.prepare('SELECT COUNT(*) AS total FROM orders').first(),
-        env.DB.prepare('SELECT COUNT(*) AS total FROM tools').first(),
-        env.DB.prepare('SELECT COUNT(*) AS total FROM blog_posts').first(),
-      ]);
-
+    const [books, published, drafts, review, users, orders, tools, posts] = await Promise.all([
+      env.BOOKS_DB.prepare('SELECT COUNT(*) AS total FROM books').first(),
+      env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status = 'published'").first(),
+      env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status IN ('draft','research','planning','writing')").first(),
+      env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status = 'review'").first(),
+      env.DB.prepare('SELECT COUNT(*) AS total FROM users').first(),
+      env.DB.prepare('SELECT COUNT(*) AS total FROM orders').first(),
+      env.DB.prepare('SELECT COUNT(*) AS total FROM tools').first(),
+      env.DB.prepare('SELECT COUNT(*) AS total FROM blog_posts').first(),
+    ]);
     const revenue = await env.DB.prepare(
       "SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS total FROM orders WHERE status IN ('COMPLETED','CAPTURED','APPROVED')",
     ).first();
-
     const aiJobs = await env.BOOKS_DB.prepare(
-      `SELECT COUNT(*) AS total FROM ai_jobs WHERE created_at >= ?`,
+      'SELECT COUNT(*) AS total FROM ai_jobs WHERE created_at >= ?',
     ).bind(now() - 86400).first();
-
     return json({
       books: {
         total: Number(books?.total || 0),
@@ -1128,9 +1058,7 @@ async function adminApi(request, env) {
               price_usd, currency, language, audience, age_rating,
               status, cover_url, pdf_available, epub_available,
               created_at, updated_at, published_at
-         FROM books
-        ORDER BY created_at DESC
-        LIMIT 100`,
+         FROM books ORDER BY created_at DESC LIMIT 100`,
     ).all();
     return json({ items: result.results || [] });
   }
@@ -1139,13 +1067,12 @@ async function adminApi(request, env) {
     const body = await bodyJson(request);
     const title = String(body?.title || '').trim();
     if (!title) return json({ error: 'Book title is required.' }, 400);
-
     const createdAt = now();
     const id = randomId('book');
     const slug = `${slugify(title)}-${id.slice(-6)}`;
     const validStatuses = [
-      'draft', 'research', 'planning', 'writing', 'review',
-      'published', 'archived',
+      'draft', 'research', 'planning', 'writing',
+      'review', 'published', 'archived',
     ];
     const status = validStatuses.includes(body?.status)
       ? body.status
@@ -1162,7 +1089,7 @@ async function adminApi(request, env) {
          seo_title, seo_description, seo_keywords, created_at,
          updated_at, published_at, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD',
-               ?, NULL, NULL, 0, 1, 1, NULL, NULL, NULL, ?, ?, ?, ?)`,
+               ?, NULL, NULL, 1, 1, NULL, NULL, NULL, ?, ?, ?, ?)`,
     ).bind(
       id,
       slug,
@@ -1223,7 +1150,6 @@ async function adminApi(request, env) {
       }),
       createdAt,
     ).run();
-
     return json({ ok: true, id, slug }, 201);
   }
 
@@ -1245,7 +1171,6 @@ async function adminApi(request, env) {
     ];
     const fields = [];
     const values = [];
-
     const editable = [
       'title', 'subtitle', 'author', 'description', 'language',
       'genre', 'subgenre', 'audience', 'age_rating', 'style',
@@ -1260,7 +1185,6 @@ async function adminApi(request, env) {
           : body[field]);
       }
     }
-
     if (body && Object.prototype.hasOwnProperty.call(body, 'status')) {
       if (!allowedStatuses.includes(body.status)) {
         return json({ error: 'Invalid book status.' }, 400);
@@ -1272,27 +1196,21 @@ async function adminApi(request, env) {
         values.push(now());
       }
     }
-
     if (!fields.length) return json({ error: 'No changes supplied.' }, 400);
     fields.push('updated_at = ?');
     values.push(now(), bookId);
-
     await env.BOOKS_DB.prepare(
       `UPDATE books SET ${fields.join(', ')} WHERE id = ?`,
     ).bind(...values).run();
-
-    const updated = await getBook(env, bookId);
-    return json({ ok: true, book: updated });
+    return json({ ok: true, book: await getBook(env, bookId) });
   }
 
   if (path === '/api/admin/series' && method === 'GET') {
     const result = await env.BOOKS_DB.prepare(
       `SELECT s.id, s.name, s.slug, s.description, s.created_at,
               COUNT(bs.book_id) AS book_count
-         FROM series s
-         LEFT JOIN book_series bs ON bs.series_id = s.id
-        GROUP BY s.id
-        ORDER BY s.created_at DESC`,
+         FROM series s LEFT JOIN book_series bs ON bs.series_id = s.id
+        GROUP BY s.id ORDER BY s.created_at DESC`,
     ).all();
     return json({ items: result.results || [] });
   }
@@ -1325,19 +1243,18 @@ async function adminApi(request, env) {
     const result = await env.BOOKS_DB.prepare(
       `SELECT id, fact_key, fact_value, immutable, version,
               reason, created_at, updated_at
-         FROM canonical_facts
-        WHERE book_id = ?
-        ORDER BY fact_key`,
+         FROM canonical_facts WHERE book_id = ? ORDER BY fact_key`,
     ).bind(bookId).all();
     const changes = await env.BOOKS_DB.prepare(
       `SELECT id, fact_key, old_value, new_value, reason,
               changed_by, created_at
-         FROM canon_changes
-        WHERE book_id = ?
-        ORDER BY created_at DESC
-        LIMIT 100`,
+         FROM canon_changes WHERE book_id = ?
+        ORDER BY created_at DESC LIMIT 100`,
     ).bind(bookId).all();
-    return json({ facts: result.results || [], changes: changes.results || [] });
+    return json({
+      facts: result.results || [],
+      changes: changes.results || [],
+    });
   }
 
   if (path === '/api/admin/canon' && method === 'POST') {
@@ -1349,21 +1266,16 @@ async function adminApi(request, env) {
     if (!bookId || !factKey || !factValue) {
       return json({ error: 'book_id, fact_key and fact_value are required.' }, 400);
     }
-
     const existing = await env.BOOKS_DB.prepare(
       `SELECT * FROM canonical_facts
         WHERE book_id = ? AND fact_key = ? LIMIT 1`,
     ).bind(bookId, factKey).first();
-
-    if (existing?.immutable && existing.fact_value !== factValue && !reason) {
-      return json({ error: 'A reason is required for a locked canon change.' }, 409);
-    }
-
     const version = Number(existing?.version || 0) + 1;
     if (existing) {
       await env.BOOKS_DB.prepare(
         `UPDATE canonical_facts
-            SET fact_value = ?, immutable = ?, version = ?, reason = ?, updated_at = ?
+            SET fact_value = ?, immutable = ?, version = ?,
+                reason = ?, updated_at = ?
           WHERE id = ?`,
       ).bind(
         factValue,
@@ -1373,11 +1285,11 @@ async function adminApi(request, env) {
         now(),
         existing.id,
       ).run();
-
       if (existing.fact_value !== factValue) {
         await env.BOOKS_DB.prepare(
           `INSERT INTO canon_changes
-            (id, book_id, fact_key, old_value, new_value, reason, changed_by, created_at)
+            (id, book_id, fact_key, old_value, new_value,
+             reason, changed_by, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ).bind(
           randomId('canonchange'),
@@ -1393,7 +1305,8 @@ async function adminApi(request, env) {
     } else {
       await env.BOOKS_DB.prepare(
         `INSERT INTO canonical_facts
-          (id, book_id, fact_key, fact_value, immutable, version, reason, created_at, updated_at)
+          (id, book_id, fact_key, fact_value, immutable, version,
+           reason, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       ).bind(
         randomId('canon'),
@@ -1406,7 +1319,6 @@ async function adminApi(request, env) {
         now(),
       ).run();
     }
-
     return json({ ok: true });
   }
 
@@ -1416,14 +1328,9 @@ async function adminApi(request, env) {
     const entityType = String(body?.entity_type || 'character').trim();
     const name = String(body?.canonical_name || '').trim();
     if (!bookId || !name) return json({ error: 'Book and name are required.' }, 400);
-    const result = await semanticCandidates(
-      env,
-      bookId,
-      entityType,
-      name,
-      body?.metadata || {},
-    );
-    return json({ ok: true, query: { entityType, name }, ...result });
+    return json({ ok: true, query: { entityType, name }, ...await semanticCandidates(
+      env, bookId, entityType, name, body?.metadata || {},
+    ) });
   }
 
   if (path === '/api/admin/registry' && method === 'POST') {
@@ -1434,7 +1341,8 @@ async function adminApi(request, env) {
     if (!bookId || !name) return json({ error: 'Book and name are required.' }, 400);
     await env.BOOKS_DB.prepare(
       `INSERT INTO entity_registry
-        (id, book_id, entity_type, canonical_name, aliases_json, metadata_json, created_at, updated_at)
+        (id, book_id, entity_type, canonical_name, aliases_json,
+         metadata_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       randomId('entity'),
@@ -1454,9 +1362,7 @@ async function adminApi(request, env) {
       return await adminAI(request, env, admin);
     } catch (error) {
       console.error(error);
-      return json({
-        error: error?.message || 'Workers AI request failed.',
-      }, 500);
+      return json({ error: error?.message || 'Workers AI request failed.' }, 500);
     }
   }
 
@@ -1468,29 +1374,19 @@ async function adminApi(request, env) {
     if (!book) return json({ error: 'Book not found.' }, 404);
     const prompt = String(body?.prompt || '').trim()
       || `${book.genre || 'literary'} book cover, ${book.style || 'editorial'} aesthetic, ${book.premise || book.title}, title-safe composition, no readable text`;
-
     const result = await env.AI.run(IMAGE_MODEL, {
       prompt,
       seed: Math.floor(Math.random() * 1000000000),
     });
     if (!result?.image) return json({ error: 'Cover generation returned no image.' }, 502);
-
     const dataUri = `data:image/jpeg;base64,${result.image}`;
     const id = randomId('cover');
     await env.BOOKS_DB.prepare(
       `INSERT INTO covers
-        (id, book_id, prompt, model, data_uri, status, selected, created_at, created_by)
+        (id, book_id, prompt, model, data_uri, status, selected,
+         created_at, created_by)
        VALUES (?, ?, ?, ?, ?, 'generated', 0, ?, ?)`,
-    ).bind(
-      id,
-      bookId,
-      prompt,
-      IMAGE_MODEL,
-      dataUri,
-      now(),
-      admin.user_id,
-    ).run();
-
+    ).bind(id, bookId, prompt, IMAGE_MODEL, dataUri, now(), admin.user_id).run();
     return json({ ok: true, id, data_uri: dataUri });
   }
 
@@ -1498,18 +1394,17 @@ async function adminApi(request, env) {
     const body = await bodyJson(request);
     const coverId = String(body?.cover_id || '').trim();
     const cover = await env.BOOKS_DB.prepare(
-      `SELECT id, book_id FROM covers WHERE id = ? LIMIT 1`,
+      'SELECT id, book_id FROM covers WHERE id = ? LIMIT 1',
     ).bind(coverId).first();
     if (!cover) return json({ error: 'Cover not found.' }, 404);
-
     await env.BOOKS_DB.prepare(
-      `UPDATE covers SET selected = 0 WHERE book_id = ?`,
+      'UPDATE covers SET selected = 0 WHERE book_id = ?',
     ).bind(cover.book_id).run();
     await env.BOOKS_DB.prepare(
-      `UPDATE covers SET selected = 1 WHERE id = ?`,
+      'UPDATE covers SET selected = 1 WHERE id = ?',
     ).bind(coverId).run();
     await env.BOOKS_DB.prepare(
-      `UPDATE books SET cover_url = ?, updated_at = ? WHERE id = ?`,
+      'UPDATE books SET cover_url = ?, updated_at = ? WHERE id = ?',
     ).bind(
       `/api/books/${encodeURIComponent(cover.book_id)}/cover`,
       now(),
@@ -1523,7 +1418,8 @@ async function adminApi(request, env) {
     if (!bookId) return json({ error: 'book_id is required.' }, 400);
     const result = await env.BOOKS_DB.prepare(
       `SELECT id, book_id, prompt, model, status, selected, created_at
-         FROM covers WHERE book_id = ? ORDER BY created_at DESC LIMIT 30`,
+         FROM covers WHERE book_id = ?
+        ORDER BY created_at DESC LIMIT 30`,
     ).bind(bookId).all();
     return json({ items: result.results || [] });
   }
@@ -1543,18 +1439,21 @@ async function adminApi(request, env) {
   if (path === '/api/admin/sales' && method === 'GET') {
     const bookId = url.searchParams.get('book_id');
     const productId = bookId ? `prd_book_${bookId}` : null;
-    const ordersQuery = productId
+    const query = productId
       ? env.DB.prepare(
           `SELECT COUNT(*) AS orders,
                   COALESCE(SUM(CAST(amount AS REAL)), 0) AS revenue
-             FROM orders WHERE product_id = ? AND status IN ('COMPLETED','CAPTURED','APPROVED')`,
+             FROM orders
+            WHERE product_id = ?
+              AND status IN ('COMPLETED','CAPTURED','APPROVED')`,
         ).bind(productId)
       : env.DB.prepare(
           `SELECT COUNT(*) AS orders,
                   COALESCE(SUM(CAST(amount AS REAL)), 0) AS revenue
-             FROM orders WHERE status IN ('COMPLETED','CAPTURED','APPROVED')`,
+             FROM orders
+            WHERE status IN ('COMPLETED','CAPTURED','APPROVED')`,
         );
-    const row = await ordersQuery.first();
+    const row = await query.first();
     return json({
       orders: Number(row?.orders || 0),
       revenue: Number(row?.revenue || 0),
@@ -1585,9 +1484,7 @@ async function adminApi(request, env) {
     const result = await env.DB.prepare(
       `SELECT id, slug, title, description, category, route, status,
               created_at, updated_at
-         FROM tools
-        ORDER BY created_at DESC
-        LIMIT 100`,
+         FROM tools ORDER BY created_at DESC LIMIT 100`,
     ).all();
     return json({ items: result.results || [] });
   }
@@ -1623,8 +1520,7 @@ async function adminApi(request, env) {
               created_at, updated_at
          FROM products
         WHERE type IN ('sample', 'midi', 'preset')
-        ORDER BY created_at DESC
-        LIMIT 100`,
+        ORDER BY created_at DESC LIMIT 100`,
     ).all();
     return json({ items: result.results || [] });
   }
@@ -1633,8 +1529,7 @@ async function adminApi(request, env) {
     const body = await bodyJson(request);
     const title = String(body?.title || '').trim();
     const type = ['sample', 'midi', 'preset'].includes(body?.type)
-      ? body.type
-      : 'sample';
+      ? body.type : 'sample';
     if (!title) return json({ error: 'Product name is required.' }, 400);
     const createdAt = now();
     const id = randomId('prd');
@@ -1660,9 +1555,7 @@ async function adminApi(request, env) {
     const result = await env.DB.prepare(
       `SELECT id, slug, title, excerpt, author_name, status,
               created_at, updated_at, published_at
-         FROM blog_posts
-        ORDER BY created_at DESC
-        LIMIT 100`,
+         FROM blog_posts ORDER BY created_at DESC LIMIT 100`,
     ).all();
     return json({ items: result.results || [] });
   }
@@ -1735,80 +1628,77 @@ function wrapText(value, max = 88) {
 
 function buildPdf(title, author, chapters) {
   const pages = [];
-  let pageLines = [title, `By ${author}`,''];
-
+  let pageLines = [title, `By ${author}`, ''];
   const flush = () => {
     if (pageLines.length) pages.push([...pageLines]);
     pageLines = [];
   };
-
   for (const chapter of chapters) {
     const heading = `Chapter ${chapter.chapter_number}: ${chapter.title || ''}`.trim();
     const headingLines = wrapText(heading, 54);
-    const bodyLines = String(chapter.content || '').replace(/\r/g, '').split(/\n+/).flatMap((line) => {
-      const text = line.trim();
-      return text ? wrapText(text, 92) : [''];
-    });
-    const all = ['', ...headingLines, '', ...bodyLines, ''];
-    for (const line of all) {
+    const bodyLines = String(chapter.content || '')
+      .replace(/\r/g, '')
+      .split(/\n+/)
+      .flatMap((line) => {
+        const text = line.trim();
+        return text ? wrapText(text, 92) : [''];
+      });
+    for (const line of ['', ...headingLines, '', ...bodyLines, '']) {
       if (pageLines.length >= 47) flush();
       pageLines.push(line);
     }
   }
   flush();
+  if (!pages.length) {
+    pages.push([title, `By ${author}`, '', 'This book is ready for content.']);
+  }
 
-  if (!pages.length) pages.push([title, `By ${author}`, '', 'This book is ready for content.']);
-
-  const objects = [];
-  const catalogId = 1;
-  const pagesId = 2;
-  const fontId = 3;
+  const objects = ['', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
   const pageIds = [];
   const contentIds = [];
-
-  objects.push('');
-  objects.push('');
-  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const pagesId = 2;
+  const fontId = 3;
 
   for (const lines of pages) {
     pageIds.push(objects.length + 1);
     contentIds.push(objects.length + 2);
     const commands = ['BT', '/F1 18 Tf', '54 770 Td'];
-    const first = textEscapePdf(lines[0] || title);
-    commands.push(`(${first}) Tj`);
+    commands.push(`(${textEscapePdf(lines[0] || title)}) Tj`);
     commands.push('/F1 11 Tf', '0 -24 Td');
     for (let i = 1; i < lines.length; i += 1) {
-      const line = lines[i];
-      commands.push(`(${textEscapePdf(line)}) Tj`, '0 -14 Td');
+      commands.push(`(${textEscapePdf(lines[i])}) Tj`, '0 -14 Td');
     }
     commands.push('ET');
     const stream = commands.join('\n');
-    objects.push(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds[contentIds.length - 1]} 0 R >>`);
+    objects.push(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds.at(-1)} 0 R >>`,
+    );
     objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
   }
 
   objects[0] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
   objects[1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] >>`;
 
-  const chunks = ['%PDF-1.4\n%âãÏÓ\n'];
+  const header = '%PDF-1.4\n%NEXAUREN\n';
+  const chunks = [header];
   const offsets = [0];
-  let position = chunks[0].length;
-
+  let position = header.length;
   for (let i = 0; i < objects.length; i += 1) {
-    const objectNumber = i + 1;
-    const body = `${objectNumber} 0 obj\n${objects[i]}\nendobj\n`;
-    offsets[objectNumber] = position;
+    const number = i + 1;
+    const body = `${number} 0 obj\n${objects[i]}\nendobj\n`;
+    offsets[number] = position;
     chunks.push(body);
     position += body.length;
   }
-
   const xrefOffset = position;
   chunks.push(`xref\n0 ${objects.length + 1}\n`);
   chunks.push('0000000000 65535 f \n');
   for (let i = 1; i <= objects.length; i += 1) {
     chunks.push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
   }
-  chunks.push(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+  chunks.push(
+    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
+  );
   return new TextEncoder().encode(chunks.join(''));
 }
 
@@ -1852,10 +1742,11 @@ function zipStore(files) {
   const local = [];
   const central = [];
   let offset = 0;
-
   for (const file of files) {
     const name = encoder.encode(file.name);
-    const data = file.data instanceof Uint8Array ? file.data : encoder.encode(file.data);
+    const data = file.data instanceof Uint8Array
+      ? file.data
+      : encoder.encode(file.data);
     const crc = crc32(data);
     const localHeader = concatBytes([
       new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
@@ -1864,7 +1755,6 @@ function zipStore(files) {
       u16(name.length), u16(0), name,
     ]);
     local.push(localHeader, data);
-
     const centralHeader = concatBytes([
       new Uint8Array([0x50, 0x4b, 0x01, 0x02]),
       u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
@@ -1875,7 +1765,6 @@ function zipStore(files) {
     central.push(centralHeader);
     offset += localHeader.length + data.length;
   }
-
   const centralData = concatBytes(central);
   const localData = concatBytes(local);
   const end = concatBytes([
@@ -1883,12 +1772,10 @@ function zipStore(files) {
     u16(0), u16(0), u16(files.length), u16(files.length),
     u32(centralData.length), u32(localData.length), u16(0),
   ]);
-
   return concatBytes([localData, centralData, end]);
 }
 
 function buildEpub(title, author, chapters) {
-  const encoder = new TextEncoder();
   const files = [
     {
       name: 'mimetype',
@@ -1899,7 +1786,6 @@ function buildEpub(title, author, chapters) {
       data: `<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`,
     },
   ];
-
   const manifest = [];
   const spine = [];
   chapters.forEach((chapter, index) => {
@@ -1918,53 +1804,32 @@ function buildEpub(title, author, chapters) {
       data: `<?xml version="1.0" encoding="UTF-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${xmlEscape(chapter.title || `Chapter ${chapter.chapter_number}`)}</title></head><body><h1>${xmlEscape(chapter.title || `Chapter ${chapter.chapter_number}`)}</h1>${paragraphs}</body></html>`,
     });
   });
-
   files.push({
     name: 'OEBPS/nav.xhtml',
     data: `<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Contents</title></head><body><nav epub:type="toc"><ol>${chapters.map((chapter, index) => `<li><a href="chapter-${index + 1}.xhtml">${xmlEscape(chapter.title || `Chapter ${chapter.chapter_number}`)}</a></li>`).join('')}</ol></nav></body></html>`,
   });
-
   files.push({
     name: 'OEBPS/content.opf',
-    data: `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">nexauren:${sha256Local(title + author)}</dc:identifier><dc:title>${xmlEscape(title)}</dc:title><dc:creator>${xmlEscape(author)}</dc:creator><dc:language>en</dc:language></metadata><manifest>${manifest.join('')}<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/></manifest><spine>${spine.join('')}</spine></package>`,
+    data: `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">nexauren:${slugify(title)}-${slugify(author)}</dc:identifier><dc:title>${xmlEscape(title)}</dc:title><dc:creator>${xmlEscape(author)}</dc:creator><dc:language>en</dc:language></metadata><manifest>${manifest.join('')}<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/></manifest><spine>${spine.join('')}</spine></package>`,
   });
-
-  void encoder;
   return zipStore(files);
 }
 
-function sha256Local(value) {
-  let hash = 2166136261;
-  for (const char of String(value)) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return Math.abs(hash).toString(16);
-}
-
 async function getDownloadBook(env, slug) {
-  const book = await env.BOOKS_DB.prepare(
-    `SELECT * FROM books
-      WHERE slug = ? AND status = 'published' LIMIT 1`,
+  return env.BOOKS_DB.prepare(
+    `SELECT * FROM books WHERE slug = ? AND status = 'published' LIMIT 1`,
   ).bind(slug).first();
-  if (!book) return null;
-  return book;
 }
 
 async function canDownload(env, request, book) {
   const user = await requireUser(env, request);
-  if (Number(book.price_usd || 0) <= 0) {
-    return { allowed: true, user };
-  }
+  if (Number(book.price_usd || 0) <= 0) return { allowed: true, user };
   if (!user) return { allowed: false, user: null };
-
-  const productId = `prd_book_${book.id}`;
   const purchase = await env.DB.prepare(
     `SELECT p.id FROM purchases p
-       WHERE p.user_id = ? AND p.product_id = ? AND p.status = 'ACTIVE'
-       LIMIT 1`,
-  ).bind(user.user_id, productId).first();
-
+       WHERE p.user_id = ? AND p.product_id = ?
+         AND p.status = 'ACTIVE' LIMIT 1`,
+  ).bind(user.user_id, `prd_book_${book.id}`).first();
   return { allowed: Boolean(purchase), user };
 }
 
@@ -1978,14 +1843,13 @@ async function publicBooksApi(request, env) {
               language, genre, subgenre, audience, age_rating,
               price_usd, currency, cover_url, preview_url,
               published_at, 1 AS pdf_available, 1 AS epub_available
-         FROM books
-        WHERE status = 'published'
-        ORDER BY published_at DESC, created_at DESC
-        LIMIT 200`,
+         FROM books WHERE status = 'published'
+        ORDER BY published_at DESC, created_at DESC LIMIT 200`,
     ).all();
     const items = await Promise.all((result.results || []).map(async (book) => {
       const cover = await env.BOOKS_DB.prepare(
-        `SELECT id FROM covers WHERE book_id = ? AND selected = 1 LIMIT 1`,
+        `SELECT id FROM covers WHERE book_id = ?
+           AND selected = 1 LIMIT 1`,
       ).bind(book.id).first();
       return {
         ...book,
@@ -2000,7 +1864,8 @@ async function publicBooksApi(request, env) {
   const coverIdMatch = path.match(/^\/api\/books\/([^/]+)\/cover$/);
   if (coverIdMatch && request.method === 'GET') {
     const book = await env.BOOKS_DB.prepare(
-      `SELECT id FROM books WHERE id = ? AND status = 'published' LIMIT 1`,
+      `SELECT id FROM books
+        WHERE id = ? AND status = 'published' LIMIT 1`,
     ).bind(coverIdMatch[1]).first();
     if (!book) return new Response('Not found', { status: 404 });
     const cover = await env.BOOKS_DB.prepare(
@@ -2026,10 +1891,12 @@ async function publicBooksApi(request, env) {
     if (!book) return json({ error: 'Book not found.' }, 404);
     const product = await env.DB.prepare(
       `SELECT id, title, price_usd, currency, status
-         FROM products WHERE type = 'book' AND external_id = ? LIMIT 1`,
+         FROM products
+        WHERE type = 'book' AND external_id = ? LIMIT 1`,
     ).bind(book.id).first();
     const cover = await env.BOOKS_DB.prepare(
-      `SELECT id FROM covers WHERE book_id = ? AND selected = 1 LIMIT 1`,
+      `SELECT id FROM covers WHERE book_id = ?
+         AND selected = 1 LIMIT 1`,
     ).bind(book.id).first();
     return json({
       book: {
@@ -2057,17 +1924,13 @@ async function publicBooksApi(request, env) {
     if (!access.allowed) {
       return json({ error: 'Sign in and purchase this book before downloading.' }, 403);
     }
-
     const chapters = (await getBookChapters(env, book.id))
       .filter((item) => Number(item.is_current) === 1)
       .sort((a, b) => Number(a.chapter_number) - Number(b.chapter_number));
-
-    const safeTitle = slugify(book.title) || 'nexauren-book';
-    const filename = `${safeTitle}.${format}`;
+    const filename = `${slugify(book.title) || 'nexauren-book'}.${format}`;
     const bytes = format === 'pdf'
       ? buildPdf(book.title, book.author, chapters)
       : buildEpub(book.title, book.author, chapters);
-
     await env.BOOKS_DB.prepare(
       `INSERT INTO download_logs
         (id, book_id, user_id, format, created_at)
@@ -2079,19 +1942,16 @@ async function publicBooksApi(request, env) {
       format,
       now(),
     ).run();
-
     return new Response(bytes, {
       status: 200,
       headers: {
         'content-type': format === 'pdf'
-          ? 'application/pdf'
-          : 'application/epub+zip',
+          ? 'application/pdf' : 'application/epub+zip',
         'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
         'cache-control': 'private, no-store',
       },
     });
   }
-
   return json({ error: 'Books API route not found.' }, 404);
 }
 
@@ -2112,20 +1972,10 @@ async function api(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
-
   try {
-    if (path.startsWith('/api/admin/')) {
-      return adminApi(request, env);
-    }
-
-    if (path.startsWith('/api/books')) {
-      return publicBooksApi(request, env);
-    }
-
-    if (path.startsWith('/api/paypal/')) {
-      return paypalApi(request, env);
-    }
-
+    if (path.startsWith('/api/admin/')) return adminApi(request, env);
+    if (path.startsWith('/api/books')) return publicBooksApi(request, env);
+    if (path.startsWith('/api/paypal/')) return paypalApi(request, env);
     if (path === '/api/health' && method === 'GET') {
       return json({
         ok: true,
@@ -2134,33 +1984,20 @@ async function api(request, env) {
         ai: Boolean(env.AI),
       });
     }
-
-    if (path === '/api/auth/register' && method === 'POST') {
-      return authRegister(env, request);
-    }
-
-    if (path === '/api/auth/login' && method === 'POST') {
-      return authLogin(env, request);
-    }
-
-    if (path === '/api/auth/logout' && method === 'POST') {
-      return authLogout(env, request);
-    }
-
+    if (path === '/api/auth/register' && method === 'POST') return authRegister(env, request);
+    if (path === '/api/auth/login' && method === 'POST') return authLogin(env, request);
+    if (path === '/api/auth/logout' && method === 'POST') return authLogout(env, request);
     if (path === '/api/auth/me' && method === 'GET') {
       const user = await requireUser(env, request);
       return json({
-        user: user
-          ? {
-              id: user.user_id,
-              email: user.email,
-              name: user.name,
-              role: user.role,
-            }
-          : null,
+        user: user ? {
+          id: user.user_id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        } : null,
       });
     }
-
     if (path === '/api/account' && method === 'GET') {
       const user = await requireUser(env, request);
       if (!user) return json({ user: null });
@@ -2171,11 +2008,8 @@ async function api(request, env) {
       const purchases = await env.DB.prepare(
         `SELECT p.id, p.product_id, p.status, p.created_at,
                 pr.title, pr.type
-           FROM purchases p
-           JOIN products pr ON pr.id = p.product_id
-          WHERE p.user_id = ?
-          ORDER BY p.created_at DESC
-          LIMIT 100`,
+           FROM purchases p JOIN products pr ON pr.id = p.product_id
+          WHERE p.user_id = ? ORDER BY p.created_at DESC LIMIT 100`,
       ).bind(user.user_id).all();
       return json({
         user: {
@@ -2188,25 +2022,18 @@ async function api(request, env) {
         purchases: purchases.results || [],
       });
     }
-
     return json({ error: 'API route not found.' }, 404);
   } catch (error) {
     console.error(error);
-    return json({
-      error: error?.message || 'Unexpected server error.',
-    }, 500);
+    return json({ error: error?.message || 'Unexpected server error.' }, 500);
   }
 }
 
 async function asset(request, env, path) {
   const response = await env.ASSETS.fetch(request);
-
   if (path.startsWith('/admin')) {
     const headers = new Headers(response.headers);
-    headers.set(
-      'cache-control',
-      'no-store, no-cache, must-revalidate',
-    );
+    headers.set('cache-control', 'no-store, no-cache, must-revalidate');
     headers.set('pragma', 'no-cache');
     return new Response(response.body, {
       status: response.status,
@@ -2214,7 +2041,6 @@ async function asset(request, env, path) {
       headers,
     });
   }
-
   return response;
 }
 
@@ -2222,12 +2048,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-
-    if (path.startsWith('/api/')) {
-      return api(request, env);
-    }
-
-    if (path === '/admin' || path === '/admin/' || (path.startsWith('/admin/') && !path.startsWith('/admin/login'))) {
+    if (path.startsWith('/api/')) return api(request, env);
+    if (
+      path === '/admin' ||
+      path === '/admin/' ||
+      (path.startsWith('/admin/') && !path.startsWith('/admin/login'))
+    ) {
       const admin = await requireAdmin(env, request);
       if (!admin) {
         return new Response('Not found', {
@@ -2236,11 +2062,7 @@ export default {
         });
       }
     }
-
-    if (env.ASSETS) {
-      return asset(request, env, path);
-    }
-
+    if (env.ASSETS) return asset(request, env, path);
     return new Response('Nexauren Worker is running.', { status: 200 });
   },
 };
