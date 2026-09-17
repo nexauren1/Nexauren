@@ -29,17 +29,8 @@
 
   <main id="main" class="admin-shell app-grid">
     <aside class="sidebar">
-      <div class="workspace-title">
-        <span class="eyebrow">PRIVATE CONTROL CENTER</span>
-        <strong>Books Studio</strong>
-        <small>Idea to publication.</small>
-      </div>
-      <div class="book-picker">
-        <label for="book-context">Current book</label>
-        <select id="book-context" class="admin-select">
-          <option value="">Select a book…</option>
-        </select>
-      </div>
+      <div class="workspace-title"><span class="eyebrow">PRIVATE CONTROL CENTER</span><strong>Books Studio</strong><small>Idea to publication.</small></div>
+      <div class="book-picker"><label for="book-context">Current book</label><select id="book-context" class="admin-select"><option value="">Select a book…</option></select></div>
       <nav class="side-nav" aria-label="Books Admin">
         <button class="tab active" data-section="dashboard">⌂ <span>Dashboard</span></button>
         <button class="tab" data-section="books">▣ <span>Livros</span></button>
@@ -63,24 +54,11 @@
     </aside>
 
     <section class="content">
-      <div class="mobile-book-bar">
-        <label for="mobile-book-context">Livro ativo</label>
-        <select id="mobile-book-context" class="admin-select"><option value="">Select a book…</option></select>
-      </div>
+      <div class="mobile-book-bar"><label for="mobile-book-context">Livro ativo</label><select id="mobile-book-context" class="admin-select"><option value="">Select a book…</option></select></div>
 
       <section id="section-dashboard" class="view">
-        <div class="section-head">
-          <div><span class="eyebrow">NEXAURENBOOKS AI</span><h1>Dashboard</h1><p>O centro de controlo editorial do livro, da ideia até à loja.</p></div>
-          <button class="primary-button" data-go="create" type="button">＋ Novo Livro</button>
-        </div>
-        <div class="metrics" aria-label="Books overview">
-          <article><small>Livros</small><strong id="m-books">—</strong></article>
-          <article><small>Publicados</small><strong id="m-published">—</strong></article>
-          <article><small>Em criação</small><strong id="m-drafts">—</strong></article>
-          <article><small>Em revisão</small><strong id="m-review">—</strong></article>
-          <article><small>Utilizadores</small><strong id="m-users">—</strong></article>
-          <article><small>Receita</small><strong id="m-revenue">—</strong></article>
-        </div>
+        <div class="section-head"><div><span class="eyebrow">NEXAURENBOOKS AI</span><h1>Dashboard</h1><p>O centro de controlo editorial do livro, da ideia até à loja.</p></div><button class="primary-button" data-go="create" type="button">＋ Novo Livro</button></div>
+        <div class="metrics"><article><small>Livros</small><strong id="m-books">—</strong></article><article><small>Publicados</small><strong id="m-published">—</strong></article><article><small>Em criação</small><strong id="m-drafts">—</strong></article><article><small>Em revisão</small><strong id="m-review">—</strong></article><article><small>Utilizadores</small><strong id="m-users">—</strong></article><article><small>Receita</small><strong id="m-revenue">—</strong></article></div>
         <div class="dashboard-grid">
           <article class="card workflow-card"><div class="card-head"><div><span class="eyebrow">PIPELINE</span><h2>Editorial workflow</h2></div><span class="pill" id="book-stage">No book selected</span></div><div class="workflow"><span>Idea</span><b>→</b><span>Research</span><b>→</b><span>Story Bible</span><b>→</b><span>Outline</span><b>→</b><span>Writing</span><b>→</b><span>QA</span><b>→</b><span>Publish</span></div><p>Research never becomes canon automatically. Canon changes stay versioned and visible.</p></article>
           <article class="card ai-card"><div class="card-head"><div><span class="eyebrow">AI ENGINE</span><h2>Workers AI</h2></div><span class="live-dot" id="ai-dot"></span></div><p id="ai-summary">Checking the AI binding and configured models…</p><div class="model-row"><span>Text</span><code id="ai-text-model">—</code></div><div class="model-row"><span>Image</span><code id="ai-image-model">—</code></div></article>
@@ -88,10 +66,7 @@
         <div class="card recent-card"><div class="card-head"><div><span class="eyebrow">ACTIVE BOOK</span><h2 id="dashboard-book-title">Select a book</h2></div><button class="secondary-button" data-go="bible" type="button">Open workspace →</button></div><div id="dashboard-book-info" class="info-grid"><div><span>Status</span><strong>—</strong></div><div><span>Author</span><strong>—</strong></div><div><span>Genre</span><strong>—</strong></div><div><span>Chapters</span><strong>—</strong></div></div></div>
       </section>
 
-      <section id="section-books" class="view hidden">
-        <div class="section-head"><div><span class="eyebrow">CATALOGUE</span><h1>Livros</h1><p>Todos os projetos Books e o respetivo estado editorial.</p></div><button class="primary-button" data-go="create" type="button">＋ Novo Livro</button></div>
-        <div id="books-list" class="stack-list"></div>
-      </section>
+      <section id="section-books" class="view hidden"><div class="section-head"><div><span class="eyebrow">CATALOGUE</span><h1>Livros</h1><p>Todos os projetos Books e o respetivo estado editorial.</p></div><button class="primary-button" data-go="create" type="button">＋ Novo Livro</button></div><div id="books-list" class="stack-list"></div></section>
 
       <section id="section-create" class="view hidden">
         <div class="section-head"><div><span class="eyebrow">EDITORIAL INTAKE</span><h1>Criar novo livro</h1><p>Primeiro guardamos a ficha do projeto. Depois a IA pode pesquisar e construir a Story Bible.</p></div></div>
@@ -100,45 +75,38 @@
           <div class="form-section"><span class="eyebrow">DIREÇÃO</span><div class="form-grid"><label>Tamanho desejado<input name="desired_size" placeholder="Short novel / 60k words…"></label><label>N.º aproximado de capítulos<input name="approx_chapter_count" type="number" min="1" max="200" value="12"></label><label>Estilo<input name="style" placeholder="Literary, cinematic, simple…"></label><label>Ponto de vista<input name="pov" placeholder="First person / third limited…"></label><label>Tom<input name="tone" placeholder="Tense, warm, mysterious…"></label><label>Ritmo<input name="pacing" placeholder="Fast, balanced, slow burn…"></label></div></div>
           <div class="form-section"><span class="eyebrow">IDEIA E LIMITES</span><div class="form-grid"><label class="full">Ideia inicial<textarea name="premise" required placeholder="Explain the core idea, protagonist, conflict and what you want the book to feel like."></textarea></label><label class="full">Referências fornecidas pelo autor<textarea name="author_references" placeholder="Books, places, concepts, research notes…"></textarea></label><label class="full">Palavras / temas que devem aparecer<textarea name="required_themes"></textarea></label><label class="full">Coisas que não devem aparecer<textarea name="forbidden_elements"></textarea></label></div></div>
           <div class="form-section commerce-section"><span class="eyebrow">COMMERCE</span><div class="form-grid"><label>Autor<input name="author" value="Nexauren"></label><label>Preço USD<input name="price_usd" type="number" min="0" step="0.01" value="0"></label><label>Estado<select name="status"><option value="draft">Draft</option><option value="research">Research</option></select></label></div></div>
-          <div class="form-actions"><button class="primary-button" type="submit">Guardar projeto</button><button class="secondary-button" id="create-and-research" type="button">Guardar + analisar ideia com IA</button></div>
-          <p id="book-form-status" class="inline-status" role="status"></p>
+          <div class="form-actions"><button class="primary-button" type="submit">Guardar projeto</button><button class="secondary-button" id="create-and-research" type="button">Guardar + analisar ideia com IA</button></div><p id="book-form-status" class="inline-status" role="status"></p>
         </form>
       </section>
 
       <section id="section-series" class="view hidden"><div class="section-head"><div><span class="eyebrow">SERIES</span><h1>Séries</h1><p>Uma Series Bible pode guardar regras partilhadas enquanto cada livro mantém a sua própria Story Bible.</p></div></div><form id="series-form" class="card compact-form"><label>Nome da série<input name="name" required></label><label class="full">Descrição<textarea name="description"></textarea></label><button class="primary-button full" type="submit">Criar série</button></form><div id="series-list" class="stack-list"></div></section>
 
-      <section id="section-bible" class="view hidden"><div class="section-head"><div><span class="eyebrow">SOURCE OF TRUTH</span><h1>Story Bible</h1><p>A Bíblia do livro é a referência principal para escrita, continuidade e continuação.</p></div><button class="primary-button ai-action" data-ai="story_bible" type="button">Gerar Story Bible com IA</button></div><div id="bible-state" class="ai-result card"><div class="empty-state">Selecione um livro e gere ou carregue a Story Bible.</div></div></section>
+      <section id="section-bible" class="view hidden">
+        <div class="section-head"><div><span class="eyebrow">SOURCE OF TRUTH</span><h1>Story Bible</h1><p>A Bíblia do livro é a referência principal para escrita, continuidade e continuação.</p></div><div class="head-actions"><button class="secondary-button ai-action" data-ai="research" type="button">Analisar ideia com IA</button><button class="primary-button ai-action" data-ai="story_bible" type="button">Gerar Story Bible</button></div></div>
+        <div class="card pipeline-card"><div class="pipeline-label">RESEARCH</div><div id="research-view" class="ai-result"><div class="empty-state">A pesquisa é salva como rascunho e nunca vira canon automaticamente.</div></div></div>
+        <div class="card pipeline-card"><div class="pipeline-label">STORY BIBLE</div><div id="bible-state" class="ai-result"><div class="empty-state">Selecione um livro e gere ou carregue a Story Bible.</div></div></div>
+        <div class="card canon-card"><div class="card-head"><div><span class="eyebrow">CANON CONTROL</span><h2>Canon Lock</h2><p>Fatos bloqueados são enviados ao Writer e ao Continuity Checker como fonte de verdade.</p></div><span class="pill">Versioned</span></div><form id="canon-form" class="form-grid"><label>Fact key<input name="fact_key" placeholder="character.kael.age" required></label><label>Fact value<input name="fact_value" placeholder="23" required></label><label>Motivo<input name="reason" value="Manual canon decision"></label><label class="check-label"><input name="immutable" type="checkbox" checked> 🔒 Bloquear</label><div class="full form-actions"><button class="primary-button" type="submit">Guardar canon</button></div></form><div id="canon-list" class="canon-list"></div></div>
+      </section>
 
       <section id="section-characters" class="view hidden"><div class="section-head"><div><span class="eyebrow">ENTITY REGISTRY</span><h1>Personagens</h1><p>IDs estáveis e proteção contra personagens semanticamente semelhantes.</p></div></div><div class="card registry-form"><div class="form-grid"><label>Nome novo<input id="registry-name"></label><label>Tipo<select id="registry-type"><option value="character">Character</option><option value="location">Location</option><option value="organization">Organization</option></select></label><label class="full">Metadados<textarea id="registry-meta" placeholder='{"role":"protagonist","age":23}'></textarea></label></div><div class="form-actions"><button id="registry-check" class="secondary-button" type="button">Verificar semelhanças</button><button id="registry-save" class="primary-button" type="button">Registar entidade</button></div><div id="registry-result"></div></div><div id="characters-list" class="entity-grid"></div></section>
 
       <section id="section-world" class="view hidden"><div class="section-head"><div><span class="eyebrow">WORLD BUILDER</span><h1>Mundo / Locais</h1><p>Países, cidades, locais, cultura, tecnologia, regras e organizações.</p></div></div><div id="world-view" class="card json-view"></div></section>
-
       <section id="section-timeline" class="view hidden"><div class="section-head"><div><span class="eyebrow">CHRONOLOGY</span><h1>Linha do tempo</h1><p>Eventos anteriores, eventos do livro e possíveis eventos futuros.</p></div></div><div id="timeline-view" class="timeline"></div></section>
 
-      <section id="section-chapters" class="view hidden"><div class="section-head"><div><span class="eyebrow">WRITING ROOM</span><h1>Capítulos</h1><p>A IA gera um capítulo de cada vez usando Story Bible, Canon, Outline, capítulo anterior e Story State.</p></div></div><div class="card chapter-controls"><div class="form-grid"><label>Capítulo<input id="chapter-number" type="number" min="1" value="1"></label><label class="full">Instruções para esta geração<textarea id="chapter-instructions" placeholder="What should happen in this version? What should be emphasized or avoided?"></textarea></label></div><div class="form-actions"><button class="primary-button ai-action" data-ai="outline" type="button">Gerar Outline</button><button class="primary-button ai-action" data-ai="chapter" type="button">Gerar capítulo</button></div></div><div id="chapters-list" class="chapter-list"></div></section>
+      <section id="section-chapters" class="view hidden"><div class="section-head"><div><span class="eyebrow">WRITING ROOM</span><h1>Capítulos</h1><p>A IA gera um capítulo de cada vez usando Story Bible, Canon, Outline, capítulo anterior e Story State.</p></div></div><div class="card chapter-controls"><div class="form-grid"><label>Capítulo<input id="chapter-number" type="number" min="1" value="1"></label><label class="full">Instruções para esta geração<textarea id="chapter-instructions" placeholder="What should happen in this version? What should be emphasized or avoided?"></textarea></label></div><div class="form-actions"><button class="primary-button ai-action" data-ai="outline" type="button">Gerar Outline</button><button class="primary-button ai-action" data-ai="chapter" type="button">Gerar capítulo</button><button class="secondary-button ai-action" data-ai="story_state" type="button">Atualizar Story State</button></div></div><div id="chapters-list" class="chapter-list"></div></section>
 
       <section id="section-continuity" class="view hidden"><div class="section-head"><div><span class="eyebrow">GUARDRAILS</span><h1>Continuidade</h1><p>Confere idade, nomes, locais, presença, conhecimento, objetos, relações e cronologia.</p></div><button class="primary-button ai-action" data-ai="continuity" type="button">Verificar continuidade</button></div><div id="continuity-view" class="card ai-result"></div></section>
-
       <section id="section-qa" class="view hidden"><div class="section-head"><div><span class="eyebrow">FINAL REVIEW</span><h1>QA / Revisão</h1><p>Uma revisão de publicação pode bloquear problemas críticos antes do lançamento.</p></div><button class="primary-button ai-action" data-ai="qa" type="button">Executar Book QA</button></div><div id="qa-view" class="card ai-result"></div></section>
-
       <section id="section-originality" class="view hidden"><div class="section-head"><div><span class="eyebrow">CHECK</span><h1>Originalidade</h1><p>O sistema procura correspondências relevantes e mostra as limitações da verificação. Não declara “100% original”.</p></div><button class="primary-button ai-action" data-ai="originality" type="button">Executar verificação</button></div><div id="originality-view" class="card ai-result"></div></section>
-
       <section id="section-covers" class="view hidden"><div class="section-head"><div><span class="eyebrow">VISUAL IDENTITY</span><h1>Capas</h1><p>Pré-visualize capas geradas por Workers AI e escolha a versão ligada ao livro.</p></div></div><form id="cover-form" class="card compact-form"><label>Prompt visual<textarea name="prompt" placeholder="Genre, scene, atmosphere, composition, characters…"></textarea></label><button class="primary-button full" type="submit">Gerar capa com IA</button></form><div id="covers-view" class="cover-grid"></div></section>
-
       <section id="section-files" class="view hidden"><div class="section-head"><div><span class="eyebrow">DIGITAL DELIVERY</span><h1>PDFs / EPUBs</h1><p>Os ficheiros são gerados sob pedido a partir do texto aprovado. Não dependemos de Backblaze B2.</p></div></div><div id="files-view" class="card file-card"></div></section>
-
-      <section id="section-publication" class="view hidden"><div class="section-head"><div><span class="eyebrow">STORE CONTROL</span><h1>Publicação</h1><p>Fluxo: DRAFT → REVIEW → PUBLISHED. A publicação muda a visibilidade no Books público.</p></div></div><div class="card publication-card"><div id="publication-status" class="publication-status"></div><div class="publish-actions"><button class="secondary-button status-button" data-status="draft" type="button">Draft</button><button class="secondary-button status-button" data-status="review" type="button">Review</button><button class="secondary-button status-button" data-status="published" type="button">Publish</button></div><label>Preço USD<input id="publication-price" type="number" min="0" step="0.01"></label><button id="save-publication" class="primary-button" type="button">Guardar publicação</button><p id="publication-status-note" class="inline-status"></p></div></section>
-
+      <section id="section-publication" class="view hidden"><div class="section-head"><div><span class="eyebrow">STORE CONTROL</span><h1>Publicação</h1><p>Fluxo editorial: DRAFT → REVIEW → APPROVED → PUBLISHED.</p></div></div><div class="card publication-card"><div id="publication-status" class="publication-status"></div><div class="publish-actions"><button class="secondary-button status-button" data-status="draft" type="button">Draft</button><button class="secondary-button status-button" data-status="review" type="button">Review</button><button class="secondary-button status-button" data-status="approved" type="button">Approved</button><button class="secondary-button status-button" data-status="published" type="button">Publish</button></div><label>Preço USD<input id="publication-price" type="number" min="0" step="0.01"></label><button id="save-publication" class="primary-button" type="button">Guardar publicação</button><p id="publication-status-note" class="inline-status"></p></div></section>
       <section id="section-sales" class="view hidden"><div class="section-head"><div><span class="eyebrow">COMMERCE</span><h1>Preços / Vendas</h1><p>O produto comercial do livro fica sincronizado com o catálogo global de Nexauren.</p></div></div><div class="sales-grid"><article class="metric-card"><small>Pedidos</small><strong id="sales-orders">—</strong></article><article class="metric-card"><small>Receita</small><strong id="sales-revenue">—</strong></article><article class="metric-card"><small>Preço atual</small><strong id="sales-price">—</strong></article></div></section>
-
       <section id="section-seo" class="view hidden"><div class="section-head"><div><span class="eyebrow">DISCOVERABILITY</span><h1>SEO</h1><p>Slug, meta title, description, keywords, Open Graph e texto de partilha.</p></div><button class="primary-button ai-action" data-ai="seo" type="button">Gerar SEO com IA</button></div><div id="seo-view" class="card ai-result"></div></section>
-
       <section id="section-settings" class="view hidden"><div class="section-head"><div><span class="eyebrow">SYSTEM</span><h1>Configurações</h1><p>Estado das integrações e arquitetura usada pelo Books Studio.</p></div></div><div id="settings-view" class="settings-grid"></div></section>
-
       <div id="global-status" class="global-status" role="status" aria-live="polite"></div>
     </section>
   </main>
-
   <footer class="admin-shell admin-footer">NexaurenBooks Admin · Private editorial workspace · 2026</footer>
   <script src="./admin.js"></script>
 </body>
