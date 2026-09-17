@@ -24,8 +24,7 @@ async function api(path, options) {
 async function ensureAdmin() {
   const data = await api('/api/auth/me');
   if (!data.user || data.user.role !== 'admin') {
-    window.location.replace('/admin/login/');
-    return null;
+    throw new Error('Admin session not found. Please sign in again.');
   }
   document.getElementById('admin-user').textContent = data.user.email;
   return data.user;
@@ -132,11 +131,16 @@ document.getElementById('logout').addEventListener('click', async () => {
 });
 
 (async () => {
+  const notice = document.getElementById('overview-notice');
   try {
     const user = await ensureAdmin();
-    if (!user) return;
     await loadOverview();
+    if (notice) notice.textContent = `Signed in as ${user.email}. Admin data is connected.`;
   } catch (error) {
-    window.location.replace('/admin/login/');
+    const message = error?.message || 'Admin authentication failed.';
+    document.getElementById('admin-user').textContent = 'Session unavailable';
+    if (notice) {
+      notice.textContent = `${message} Open /admin/login/ to sign in again.`;
+    }
   }
 })();
