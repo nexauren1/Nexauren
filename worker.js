@@ -322,7 +322,22 @@ async function asset(request, env, path) {
     url.pathname = '/account/index.html';
   }
 
-  return env.ASSETS.fetch(new Request(url.toString(), request));
+  const response = await env.ASSETS.fetch(
+    new Request(url.toString(), request),
+  );
+
+  if (path.startsWith('/admin')) {
+    const headers = new Headers(response.headers);
+    headers.set('cache-control', 'no-store, no-cache, must-revalidate');
+    headers.set('pragma', 'no-cache');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  return response;
 }
 
 export default {
