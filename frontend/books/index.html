@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Nexauren Books — a focused digital bookstore and editorial workspace for discovering and publishing books.">
+  <meta name="description" content="Nexauren Books — discover and collect digital books from the Nexauren Books catalogue.">
   <meta name="theme-color" content="#f7f1e6">
   <title>Nexauren Books — Stories deserve a home</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,49 +15,98 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="books-header">
     <div class="book-shell nav-row">
-      <a class="books-brand" href="../" aria-label="Nexauren home"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a>
-      <button class="books-menu-toggle" type="button" aria-expanded="false" aria-controls="books-nav"><span></span><span></span><span></span><span class="sr-only">Open Books menu</span></button>
+      <a class="books-brand" href="../" aria-label="Nexauren home">
+        <span class="brand-symbol" aria-hidden="true">N</span>
+        <span><strong>NEXAUREN</strong><small>BOOKS</small></span>
+      </a>
+      <button class="books-menu-toggle" type="button" aria-expanded="false" aria-controls="books-nav">
+        <span></span><span></span><span></span>
+        <span class="sr-only">Open Books menu</span>
+      </button>
       <nav id="books-nav" class="books-nav" aria-label="Books navigation">
         <a class="active" aria-current="page" href="./">Home</a>
         <a href="store/">Store</a>
         <a href="categories/">Categories</a>
         <a href="#discover">Discover</a>
-        <a href="#how-it-works">About Books</a>
+        <a href="#about">About Books</a>
       </nav>
       <a class="books-account" href="../account/">My account</a>
     </div>
   </header>
+
   <main id="main">
     <section class="books-hero book-shell">
       <div class="books-hero-copy">
-        <p class="books-kicker">NEXAUREN BOOKS · A NEW DIGITAL BOOKSHOP</p>
+        <p class="books-kicker">NEXAUREN BOOKS · DIGITAL EDITIONS</p>
         <h1>Stories deserve a <span>home.</span></h1>
-        <p>Discover digital books in a calmer space — designed around reading, authors and the stories themselves.</p>
-        <div class="books-actions"><a class="book-button primary" href="store/">Explore the collection <span aria-hidden="true">→</span></a><a class="book-button soft" href="categories/">Browse genres</a></div>
+        <p>Discover books, authors and digital editions in a calmer reading space built specifically for Books.</p>
+        <div class="books-actions">
+          <a class="book-button primary" href="store/">Explore the collection <span aria-hidden="true">→</span></a>
+          <a class="book-button soft" href="categories/">Browse genres</a>
+        </div>
       </div>
-      <div class="books-stage" role="img" aria-label="Abstract concept covers representing the Nexauren Books experience">
-        <div class="book-cover cover-back"><span>CONCEPT COVER</span><strong>SEA</strong><small>NEXAUREN EDITION</small></div>
-        <div class="book-cover cover-middle"><span>CONCEPT COVER</span><strong>HOME</strong><small>EDITORIAL CONCEPT</small></div>
+      <div class="books-stage" aria-label="Nexauren Books collection preview">
+        <div class="book-cover cover-back"><span>EDITORIAL</span><strong>READ</strong><small>DIGITAL EDITION</small></div>
+        <div class="book-cover cover-middle"><span>NEXAUREN</span><strong>STORIES</strong><small>BOOK COLLECTION</small></div>
         <div class="book-cover cover-front"><span>NEXAUREN</span><strong>BOOKS</strong><small>Stories deserve a home.</small></div>
         <span class="stage-note note-one">Read · Discover · Collect</span>
-        <span class="stage-note note-two">Digital editions</span>
+        <span class="stage-note note-two">PDF · EPUB</span>
       </div>
     </section>
+
     <section id="discover" class="book-shell section" aria-labelledby="discover-title">
-      <div class="books-section-heading"><div><p class="books-kicker">DISCOVER</p><h2 id="discover-title">A library that will grow with intention.</h2></div><p>The catalogue area is ready for real titles, real authors and real metadata. No invented products are being shown as live inventory.</p></div>
-      <div class="empty-catalog"><div class="empty-mark" aria-hidden="true">✦</div><div><span class="empty-label">CATALOGUE IN PREPARATION</span><h3>Your first books will appear here.</h3><p>Once titles are added through the Books admin, this section can become the home for new releases, featured books and curated collections.</p></div><a class="book-button soft" href="admin/">Open Books admin</a></div>
-    </section>
-    <section id="categories" class="category-band section" aria-labelledby="categories-title">
-      <div class="book-shell"><div class="books-section-heading"><div><p class="books-kicker">CATEGORIES</p><h2 id="categories-title">Explore by what you want to read.</h2></div><p>Categories are intentionally simple now, so the storefront can expand later without becoming difficult to navigate.</p></div>
-        <div class="category-grid"><a class="category-card" href="store/"><span>01</span><strong>Fiction</strong><small>Stories, drama and imagination</small></a><a class="category-card" href="store/"><span>02</span><strong>Fantasy</strong><small>Worlds beyond the ordinary</small></a><a class="category-card" href="store/"><span>03</span><strong>Mystery</strong><small>Questions, clues and revelations</small></a><a class="category-card" href="store/"><span>04</span><strong>Romance</strong><small>Connection and relationships</small></a><a class="category-card" href="store/"><span>05</span><strong>Science fiction</strong><small>Future, ideas and possibility</small></a><a class="category-card" href="store/"><span>06</span><strong>Learning</strong><small>Guides, education and knowledge</small></a></div>
+      <div class="books-section-heading">
+        <div><p class="books-kicker">LATEST RELEASES</p><h2 id="discover-title">Discover what is published.</h2></div>
+        <p>The Books catalogue is connected to the live Nexauren Books database. Only titles marked as published are shown here.</p>
+      </div>
+      <div id="home-catalog" class="home-catalog">
+        <div class="catalog-loading"><div class="empty-mark" aria-hidden="true">✦</div><strong>Loading the collection…</strong><span>Checking published books.</span></div>
       </div>
     </section>
-    <section id="how-it-works" class="book-shell section about-books" aria-labelledby="about-books-title">
-      <div class="about-books-copy"><p class="books-kicker">THE BOOKS EXPERIENCE</p><h2 id="about-books-title">Everything in Books should help with Books.</h2><p>Books has its own navigation, editorial concepts and content language. Music products and tools do not need to appear inside this experience. The account remains shared at the platform level.</p></div>
-      <div class="books-pillars"><article><span>01</span><h3>Discover</h3><p>Browse by title, genre, author and curated collections.</p></article><article><span>02</span><h3>Read</h3><p>Each book gets its own focused product page and preview space.</p></article><article><span>03</span><h3>Own</h3><p>Purchases and future downloads live inside the same Nexauren account.</p></article></div>
+
+    <section id="categories" class="category-band section" aria-labelledby="categories-title">
+      <div class="book-shell">
+        <div class="books-section-heading">
+          <div><p class="books-kicker">CATEGORIES</p><h2 id="categories-title">Explore by what you want to read.</h2></div>
+          <p>Simple categories keep the storefront clear while the catalogue grows.</p>
+        </div>
+        <div class="category-grid">
+          <a class="category-card" href="store/"><span>01</span><strong>Fiction</strong><small>Stories, drama and imagination</small></a>
+          <a class="category-card" href="store/"><span>02</span><strong>Fantasy</strong><small>Worlds beyond the ordinary</small></a>
+          <a class="category-card" href="store/"><span>03</span><strong>Mystery</strong><small>Questions, clues and revelations</small></a>
+          <a class="category-card" href="store/"><span>04</span><strong>Romance</strong><small>Connection and relationships</small></a>
+          <a class="category-card" href="store/"><span>05</span><strong>Science fiction</strong><small>Future, ideas and possibility</small></a>
+          <a class="category-card" href="store/"><span>06</span><strong>Learning</strong><small>Guides, education and knowledge</small></a>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="book-shell section about-books" aria-labelledby="about-books-title">
+      <div class="about-books-copy">
+        <p class="books-kicker">THE BOOKS EXPERIENCE</p>
+        <h2 id="about-books-title">Everything in Books should help with Books.</h2>
+        <p>Books has its own navigation, editorial language and storefront. Other Nexauren experiences stay outside this space, while the account remains shared across the platform.</p>
+      </div>
+      <div class="books-pillars">
+        <article><span>01</span><h3>Discover</h3><p>Browse by title, genre, author and catalogue collections.</p></article>
+        <article><span>02</span><h3>Read</h3><p>Open a focused page for each published digital title and its available formats.</p></article>
+        <article><span>03</span><h3>Own</h3><p>Purchases and eligible downloads remain attached to the same Nexauren account.</p></article>
+      </div>
     </section>
   </main>
-  <footer class="books-footer"><div class="book-shell books-footer-grid"><div><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><p>Books is a focused Nexauren experience for digital reading and publishing.</p></div><div><h3>Books</h3><a href="./">Home</a><a href="store/">Store</a><a href="categories/">Categories</a></div><div><h3>Account</h3><a href="../account/">My account</a><a href="library/">My library</a><a href="admin/">Admin</a></div><div><h3>Legal</h3><a href="../legal/privacy.html">Privacy</a><a href="../legal/terms.html">Terms</a><a href="../legal/cookies.html">Cookies</a></div></div><div class="book-shell books-footer-bottom"><span>© <span id="year"></span> Nexauren Books</span><span>Focused on books.</span></div></footer>
+
+  <footer class="books-footer">
+    <div class="book-shell books-footer-grid">
+      <div>
+        <a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a>
+        <p>Books is a focused Nexauren experience for discovering, publishing and delivering digital books.</p>
+      </div>
+      <div><h3>Books</h3><a href="./">Home</a><a href="store/">Store</a><a href="categories/">Categories</a></div>
+      <div><h3>Account</h3><a href="../account/">My account</a><a href="library/">My library</a></div>
+      <div><h3>Legal</h3><a href="../legal/privacy.html">Privacy</a><a href="../legal/terms.html">Terms</a><a href="../legal/cookies.html">Cookies</a></div>
+    </div>
+    <div class="book-shell books-footer-bottom"><span>© <span id="year"></span> Nexauren Books</span><span>Focused on books.</span></div>
+  </footer>
   <script src="books.js"></script>
 </body>
 </html>
