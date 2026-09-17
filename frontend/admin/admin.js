@@ -193,7 +193,7 @@ function updateBookFormMode() {
   const book = state.currentBook;
   if ($('book-form-title')) $('book-form-title').textContent = book ? 'Editar projecto' : 'Criar livro';
   if ($('book-save')) $('book-save').textContent = book ? 'Guardar alterações' : 'Guardar projecto';
-  if ($('create-and-research')) $('create-and-research').textContent = book ? 'Guardar e fazer pesquisa' : 'Guardar e fazer pesquisa';
+  if ($('create-and-research')) $('create-and-research').textContent = 'Guardar e fazer pesquisa';
   if ($('project-stage')) {
     $('project-stage').textContent = book ? statusLabel(book.status) : 'Novo projecto';
     $('project-stage').className = `status-badge ${statusClass(book?.status)}`;
@@ -638,6 +638,7 @@ async function runAiButton(button) {
     if (action === 'chapter') {
       extra.chapter_number = Math.max(1, Number($('chapter-number').value || nextChapterNumber()));
       extra.instructions = $('chapter-instructions').value.trim();
+      extra.language = state.currentBook?.language || 'pt-PT';
     }
     const data = await aiAction(action, extra);
 
