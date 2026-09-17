@@ -39,7 +39,9 @@ async function sha256(value) {
 }
 
 async function hashPassword(password, saltHex) {
-  const salt = saltHex ? hexToBytes(saltHex) : crypto.getRandomValues(new Uint8Array(16));
+  const salt = saltHex
+    ? hexToBytes(saltHex)
+    : crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -116,7 +118,9 @@ async function getSession(env, request) {
 
   if (!session) return null;
   if (Number(session.expires_at) <= now()) {
-    await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(tokenHash).run();
+    await env.DB.prepare(
+      'DELETE FROM sessions WHERE id = ?'
+    ).bind(tokenHash).run();
     return null;
   }
 
@@ -223,13 +227,21 @@ async function authRegister(env, request) {
 
   if (!validEmail(email)) return json({ error: 'Enter a valid email.' }, 400);
   if (password.length < 8) {
-    return json({ error: 'Password must contain at least 8 characters.' }, 400);
+    return json(
+      { error: 'Password must contain at least 8 characters.' },
+      400,
+    );
   }
 
   const existing = await env.DB.prepare(
     'SELECT id FROM users WHERE email = ? LIMIT 1'
   ).bind(email).first();
-  if (existing) return json({ error: 'An account with this email already exists.' }, 409);
+  if (existing) {
+    return json(
+      { error: 'An account with this email already exists.' },
+      409,
+    );
+  }
 
   const id = randomId('usr');
   const passwordData = await hashPassword(password);
@@ -264,7 +276,10 @@ async function authLogin(env, request) {
   const password = String(body?.password || '');
 
   if (!validEmail(email) || !password) {
-    return json({ error: 'Email and password are required.' }, 400);
+    return json(
+      { error: 'Email and password are required.' },
+      400,
+    );
   }
 
   const user = await env.DB.prepare(
@@ -274,7 +289,9 @@ async function authLogin(env, request) {
       LIMIT 1`
   ).bind(email).first();
 
-  if (!user) return json({ error: 'Invalid email or password.' }, 401);
+  if (!user) {
+    return json({ error: 'Invalid email or password.' }, 401);
+  }
 
   const candidate = await hashPassword(password, user.password_salt);
   if (candidate.hash !== user.password_hash) {
@@ -300,7 +317,9 @@ async function authLogout(env, request) {
   const token = parseCookies(request)[SESSION_COOKIE];
   if (token) {
     const tokenHash = await sha256(token);
-    await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(tokenHash).run();
+    await env.DB.prepare(
+      'DELETE FROM sessions WHERE id = ?'
+    ).bind(tokenHash).run();
   }
 
   return json(
@@ -360,7 +379,9 @@ async function createBook(env, body, adminId) {
   const existing = await env.BOOKS_DB.prepare(
     'SELECT id FROM books WHERE slug = ? LIMIT 1'
   ).bind(slug).first();
-  if (existing) return json({ error: 'That book slug already exists.' }, 409);
+  if (existing) {
+    return json({ error: 'That book slug already exists.' }, 409);
+  }
 
   const id = randomId('book');
   const createdAt = now();
@@ -446,7 +467,9 @@ async function adminOverview(env) {
      FROM books`
   ).first();
 
-  const users = await env.DB.prepare('SELECT COUNT(*) AS total FROM users').first();
+  const users = await env.DB.prepare(
+    'SELECT COUNT(*) AS total FROM users'
+  ).first();
   const orders = await env.DB.prepare(
     `SELECT COUNT(*) AS total,
             COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN CAST(amount AS REAL) ELSE 0 END), 0) AS revenue
@@ -825,7 +848,9 @@ async function api(request, env) {
 
       const match = path.match(/^\/api\/admin\/(books|tools|samples|blog)$/);
       if (match && method === 'GET') return adminList(env, match[1]);
-      if (match && method === 'POST') return adminCreate(env, request, match[1], admin.user_id);
+      if (match && method === 'POST') {
+        return adminCreate(env, request, match[1], admin.user_id);
+      }
     }
 
     return json({ error: 'API route not found.' }, 404);
@@ -852,23 +877,28 @@ async function asset(request, env, path) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const path = url.pathname;
 
-    if (url.pathname.startsWith('/api/')) {
+    if (path.startsWith('/api/')) {
       return api(request, env);
     }
 
-    if (url.pathname === '/admin' || url.pathname === '/admin/') {
+    const isAdminLogin =
+      path === '/admin/login' ||
+      path.startsWith('/admin/login/');
+    const isAdminLoginAsset = path === '/admin/admin.css';
+
+    if (path === '/admin' || path === '/admin/') {
       const admin = await requireAdmin(env, request);
       if (!admin) return adminRedirect(request, '/admin/login/');
-    } else if (url.pathname.startsWith('/admin/')) {
-      const isLogin = url.pathname === '/admin/login' || url.pathname === '/admin/login/';
-      if (!isLogin) {
-        const admin = await requireAdmin(env, request);
-        if (!admin) return adminRedirect(request, '/admin/login/');
-      }
+    } else if (path.startsWith('/admin/') && !isAdminLogin && !isAdminLoginAsset) {
+      const admin = await requireAdmin(env, request);
+      if (!admin) return adminRedirect(request, '/admin/login/');
     }
 
-    if (env.ASSETS) return asset(request, env, url.pathname);
+    if (env.ASSETS) {
+      return asset(request, env, path);
+    }
     return new Response('Nexauren Worker is running.', { status: 200 });
   },
 };
