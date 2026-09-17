@@ -323,25 +323,7 @@ async function api(request, env) {
 }
 
 async function asset(request, env, path) {
-  const url = new URL(request.url);
-
-  if (path === '/' || path === '') {
-    url.pathname = '/index.html';
-  } else if (path === '/admin' || path === '/admin/') {
-    url.pathname = '/admin/index.html';
-  } else if (
-    path === '/admin/login' ||
-    path === '/admin/login/' ||
-    path === '/admin/login/index.html'
-  ) {
-    url.pathname = '/admin/login/index.html';
-  } else if (path === '/account' || path === '/account/') {
-    url.pathname = '/account/index.html';
-  }
-
-  const response = await env.ASSETS.fetch(
-    new Request(url.toString(), request),
-  );
+  const response = await env.ASSETS.fetch(request);
 
   if (path.startsWith('/admin')) {
     const headers = new Headers(response.headers);
@@ -369,10 +351,6 @@ export default {
       return api(request, env);
     }
 
-    // The Admin HTML itself never redirects. The page checks the
-    // authenticated role through /api/auth/me. This prevents a
-    // browser/edge redirect loop while keeping the data endpoints
-    // server-protected.
     if (env.ASSETS) {
       return asset(request, env, path);
     }
