@@ -87,8 +87,7 @@ function sessionCookie(token, maxAge = SESSION_DAYS * 86400) {
 }
 
 async function createSession(env, userId) {
-  const tokenBytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = bytesToHex(tokenBytes);
+  const token = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await sha256(token);
   const createdAt = now();
   const expiresAt = createdAt + SESSION_DAYS * 86400;
@@ -117,6 +116,7 @@ async function getSession(env, request) {
   ).bind(tokenHash).first();
 
   if (!session) return null;
+
   if (Number(session.expires_at) <= now()) {
     await env.DB.prepare('DELETE FROM sessions WHERE id = ?')
       .bind(tokenHash).run();
@@ -264,28 +264,43 @@ async function api(request, env) {
 
   try {
     if (path === '/api/health' && method === 'GET') {
-      return json({ ok: true, service: 'nexauren', time: new Date().toISOString() });
+      return json({
+        ok: true,
+        service: 'nexauren',
+        time: new Date().toISOString(),
+      });
     }
+
     if (path === '/api/auth/register' && method === 'POST') {
       return authRegister(env, request);
     }
+
     if (path === '/api/auth/login' && method === 'POST') {
       return authLogin(env, request);
     }
+
     if (path === '/api/auth/logout' && method === 'POST') {
       return authLogout(env, request);
     }
+
     if (path === '/api/auth/me' && method === 'GET') {
       const user = await requireUser(env, request);
       return json({
         user: user
-          ? { id: user.user_id, email: user.email, name: user.name, role: user.role }
+          ? {
+              id: user.user_id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+            }
           : null,
       });
     }
+
     if (path === '/api/account' && method === 'GET') {
       const user = await requireUser(env, request);
-      if (!user) return json({ user: null }, 200);
+      if (!user) return json({ user: null });
+
       return json({
         user: {
           id: user.user_id,
@@ -301,7 +316,9 @@ async function api(request, env) {
     return json({ error: 'API route not found.' }, 404);
   } catch (error) {
     console.error(error);
-    return json({ error: error?.message || 'Unexpected server error.' }, 500);
+    return json({
+      error: error?.message || 'Unexpected server error.',
+    }, 500);
   }
 }
 
@@ -328,7 +345,10 @@ async function asset(request, env, path) {
 
   if (path.startsWith('/admin')) {
     const headers = new Headers(response.headers);
-    headers.set('cache-control', 'no-store, no-cache, must-revalidate');
+    headers.set(
+      'cache-control',
+      'no-store, no-cache, must-revalidate',
+    );
     headers.set('pragma', 'no-cache');
     return new Response(response.body, {
       status: response.status,
@@ -349,23 +369,10 @@ export default {
       return api(request, env);
     }
 
-    const isAdminLogin =
-      path === '/admin/login' ||
-      path === '/admin/login/' ||
-      path === '/admin/login/index.html';
-
-    if (path === '/admin' || path === '/admin/') {
-      const admin = await requireAdmin(env, request);
-      if (!admin) {
-        return asset(request, env, '/admin/login/index.html');
-      }
-    } else if (path.startsWith('/admin/') && !isAdminLogin) {
-      const admin = await requireAdmin(env, request);
-      if (!admin) {
-        return asset(request, env, '/admin/login/index.html');
-      }
-    }
-
+    // The Admin HTML itself never redirects. The page checks the
+    // authenticated role through /api/auth/me. This prevents a
+    // browser/edge redirect loop while keeping the data endpoints
+    // server-protected.
     if (env.ASSETS) {
       return asset(request, env, path);
     }
