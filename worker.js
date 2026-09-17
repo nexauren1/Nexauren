@@ -307,21 +307,22 @@ async function api(request, env) {
 
 async function asset(request, env, path) {
   const url = new URL(request.url);
+
   if (path === '/' || path === '') {
     url.pathname = '/index.html';
   } else if (path === '/admin' || path === '/admin/') {
     url.pathname = '/admin/index.html';
+  } else if (
+    path === '/admin/login' ||
+    path === '/admin/login/' ||
+    path === '/admin/login/index.html'
+  ) {
+    url.pathname = '/admin/login/index.html';
   } else if (path === '/account' || path === '/account/') {
     url.pathname = '/account/index.html';
   }
-  return env.ASSETS.fetch(new Request(url.toString(), request));
-}
 
-function adminRedirect(request) {
-  const url = new URL(request.url);
-  url.pathname = '/admin/login/index.html';
-  url.search = '';
-  return Response.redirect(url.toString(), 302);
+  return env.ASSETS.fetch(new Request(url.toString(), request));
 }
 
 export default {
@@ -335,19 +336,25 @@ export default {
 
     const isAdminLogin =
       path === '/admin/login' ||
-      path.startsWith('/admin/login/');
+      path === '/admin/login/' ||
+      path === '/admin/login/index.html';
 
     if (path === '/admin' || path === '/admin/') {
       const admin = await requireAdmin(env, request);
-      if (!admin) return adminRedirect(request);
+      if (!admin) {
+        return asset(request, env, '/admin/login/index.html');
+      }
     } else if (path.startsWith('/admin/') && !isAdminLogin) {
       const admin = await requireAdmin(env, request);
-      if (!admin) return adminRedirect(request);
+      if (!admin) {
+        return asset(request, env, '/admin/login/index.html');
+      }
     }
 
     if (env.ASSETS) {
       return asset(request, env, path);
     }
+
     return new Response('Nexauren Worker is running.', { status: 200 });
   },
 };
