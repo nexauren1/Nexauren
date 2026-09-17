@@ -6,10 +6,7 @@
   "assets": {
     "directory": "./frontend",
     "binding": "ASSETS",
-    "run_worker_first": [
-      "/api/*",
-      "/admin*"
-    ]
+    "run_worker_first": true
   },
   "d1_databases": [
     {
