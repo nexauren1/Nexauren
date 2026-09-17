@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Your Nexauren Books library — purchased digital books in one focused reading space.">
+  <title>My Library — Nexauren Books</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../books.css">
+  <style>.library-head{padding:70px 0 35px}.library-head h1{font-family:"Playfair Display",serif;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.045em;line-height:1;margin:.3rem 0 1rem}.library-head p{max-width:620px;color:var(--muted)}.library-empty{margin-bottom:100px;padding:4rem 2rem;text-align:center;border:1px dashed #d7cab9;border-radius:28px;background:rgba(255,253,249,.5)}.library-empty h2{font-family:"Playfair Display",serif;font-size:2.2rem;margin:.6rem 0}.library-empty p{max-width:540px;margin:.5rem auto 1.2rem;color:var(--muted)}.library-footer{margin-top:90px}</style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="books-header"><div class="book-shell nav-row"><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><nav class="books-nav" aria-label="Books navigation"><a href="../">Home</a><a href="../store/">Store</a><a href="../categories/">Categories</a><a href="../#how-it-works">About Books</a></nav><a class="books-account" href="../../account/">My account</a></div></header>
+  <main id="main"><section class="book-shell library-head"><p class="books-kicker">NEXAUREN BOOKS · MY LIBRARY</p><h1>Your books, in one place.</h1><p>This page is the Books-specific library view. The underlying Nexauren account remains shared across the platform.</p></section><section class="book-shell library-empty"><div class="empty-mark" aria-hidden="true" style="margin:0 auto">Aa</div><h2>Your library is ready for real purchases.</h2><p>When authenticated purchase records are connected, acquired books can appear here with format, preview and download actions.</p><a class="book-button primary" href="../store/">Explore Books <span aria-hidden="true">→</span></a></section></main>
+  <footer class="books-footer library-footer"><div class="book-shell books-footer-grid"><div><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><p>Focused on books, from discovery to digital delivery.</p></div><div><h3>Books</h3><a href="../">Home</a><a href="../store/">Store</a><a href="../categories/">Categories</a></div><div><h3>Account</h3><a href="../../account/">My account</a><a href="./">My library</a></div><div><h3>Legal</h3><a href="../../legal/privacy.html">Privacy</a><a href="../../legal/terms.html">Terms</a><a href="../../legal/cookies.html">Cookies</a></div></div><div class="book-shell books-footer-bottom"><span>© <span id="year"></span> Nexauren Books</span><span>Library foundation</span></div></footer>
+  <script>document.getElementById('year').textContent=new Date().getFullYear();</script>
+</body>
+</html>
