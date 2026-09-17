@@ -125,3 +125,7 @@ No storage provider is assumed yet. Books metadata and file records are ready in
 - separate Books, Music and Tools public experiences;
 - no fake live catalogue products;
 - private administration enforced by the Worker, not by hiding frontend links.
+
+## Deployment sync
+
+The authentication API routes in `worker.js` are deployed as part of the same Cloudflare Worker defined by `wrangler.json`. This marker exists to trigger a fresh Cloudflare Git deployment when the repository and Worker deployment need to be resynchronized.
