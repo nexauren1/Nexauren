@@ -1,19 +1,33 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Nexauren account — one account shared across Nexauren experiences.">
   <meta name="theme-color" content="#f5f2ec">
   <title>Nexauren Account</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-  <style>
-    :root{--bg:#f5f2ec;--paper:#fffdf9;--ink:#232b39;--muted:#6e7480;--line:#e4ded4;--accent:#365d88}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"DM Sans",sans-serif}.shell{width:min(920px,calc(100% - 30px));margin:auto}.top{min-height:76px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:.65rem;font-size:.82rem;font-weight:800;letter-spacing:.14em}.mark{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--ink);color:#fff;font-family:"Playfair Display",serif;letter-spacing:0}.back{font-size:.84rem;color:#5d6570}.card{max-width:540px;margin:90px auto;padding:2rem;border:1px solid var(--line);border-radius:28px;background:var(--paper);box-shadow:0 18px 55px rgba(39,50,69,.06)}.eyebrow{text-transform:uppercase;letter-spacing:.15em;font-size:.7rem;font-weight:800;color:#7e838b}.card h1{margin:.75rem 0 0;font-family:"Playfair Display",serif;font-size:3rem;letter-spacing:-.04em}.card p{color:var(--muted)}.note{margin:1.5rem 0 0;padding:1rem;border-radius:16px;background:#f0eee9;border:1px solid #e4dfd6;font-size:.9rem}.links{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.3rem}.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 1rem;border-radius:999px;border:1px solid var(--line);font-size:.86rem;font-weight:700}.button.primary{color:#fff;background:var(--accent);border-color:var(--accent)}.foot{padding:1rem 0 2rem;color:#7d838c;font-size:.75rem;display:flex;justify-content:space-between}@media(max-width:600px){.card{margin:50px auto}.card h1{font-size:2.5rem}.foot{flex-direction:column;gap:.4rem}}
-  </style>
+  <link rel="stylesheet" href="./account.css">
 </head>
 <body>
-  <header><div class="shell top"><a class="brand" href="../"><span class="mark">N</span>NEXAUREN</a><a class="back" href="../">Back to home</a></div></header>
-  <main class="shell"><section class="card"><p class="eyebrow">ONE ACCOUNT</p><h1>Your Nexauren account.</h1><p>The account is designed to be shared across Books, Music and Tools while each experience keeps its own focused interface.</p><div class="note"><strong>Integration point ready.</strong><br>The new repository currently contains the new frontend foundation only. Authentication, existing sessions and payment connections should be wired from the working Nexauren backend rather than recreated with placeholder logic here.</div><div class="links"><a class="button primary" href="../books/">Continue to Books</a><a class="button" href="../">Nexauren home</a></div></section></main>
-  <footer class="shell foot"><span>© <span id="year"></span> Nexauren</span><a href="../legal/privacy.html">Privacy</a></footer><script>document.getElementById('year').textContent=new Date().getFullYear();</script>
+  <header class="account-header"><div class="shell top"><a class="brand" href="../"><span class="mark">N</span>NEXAUREN</a><a class="back" href="../">Back to home</a></div></header>
+  <main class="shell main">
+    <section class="heading"><p class="eyebrow">ONE ACCOUNT</p><h1>Your Nexauren account.</h1><p>One identity can be used across Nexauren. Each experience keeps its own content, while your account, purchases and credits stay centralized.</p></section>
+
+    <section id="guest-view" class="auth-grid">
+      <article class="card"><h2>Sign in</h2><p>Access your account, library and purchases.</p><form id="login-form" class="form"><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="button" type="submit">Sign in</button><p id="login-status" class="status" role="status" aria-live="polite"></p></form></article>
+      <article class="card"><h2>Create account</h2><p>Start with a Nexauren identity. You can use it for Books and future experiences.</p><form id="register-form" class="form"><label>Name<input name="name" type="text" autocomplete="name" maxlength="80"></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirm password<input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required></label><button class="button" type="submit">Create account</button><p id="register-status" class="status" role="status" aria-live="polite"></p></form></article>
+    </section>
+
+    <section id="user-view" class="dashboard hidden">
+      <article class="card"><div class="profile"><div><p class="eyebrow">ACCOUNT</p><h2 id="profile-name">Nexauren member</h2><p id="profile-email"></p></div><span id="profile-role" class="badge">user</span></div><div class="summary"><div class="summary-box"><small>Credit balance</small><strong id="credit-balance">0</strong></div><div class="summary-box"><small>Access</small><strong>Nexauren</strong></div></div><div class="links"><a class="link-button" href="../books/">Books</a><button id="logout" class="link-button" type="button">Sign out</button></div></article>
+      <article class="card"><h2>Your purchases</h2><p>Products you have acquired through Nexauren.</p><div id="purchases" class="purchase-list"></div></article>
+    </section>
+  </main>
+  <footer class="shell footer"><span>© <span id="year"></span> Nexauren · <a href="../legal/privacy.html">Privacy</a></span></footer>
+  <script>document.getElementById('year').textContent=new Date().getFullYear();</script>
+  <script src="./account.js"></script>
 </body>
 </html>
