@@ -1,6 +1,6 @@
 const SESSION_COOKIE = '__Host-nexauren_session';
 const SESSION_DAYS = 14;
-const PASSWORD_ITERATIONS = 120000;
+const PASSWORD_ITERATIONS = 30000;
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
