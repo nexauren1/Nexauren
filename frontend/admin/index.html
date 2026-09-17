@@ -102,10 +102,10 @@
         <div class="next-step card" id="next-step-card">
           <div class="next-step-main">
             <span class="eyebrow">PRÓXIMO PASSO</span>
-            <h2 id="next-step-title">Criar o teu primeiro livro</h2>
-            <p id="next-step-copy">Só precisas do título e da ideia. O resto pode ficar para depois.</p>
+            <h2 id="dashboard-next-title">Criar o primeiro livro</h2>
+            <p id="dashboard-next-copy">Não precisas de preparar tudo agora.</p>
           </div>
-          <button id="next-step-button" class="primary-button" type="button">Começar →</button>
+          <button id="dashboard-next" class="primary-button" type="button" data-go="project" data-action="start">Criar livro →</button>
         </div>
 
         <div class="progress-card card">
@@ -321,9 +321,9 @@
               </div>
 
               <div class="chapter-plan-box">
-                <label>Capítulo a escrever
-                  <select id="chapter-select">
-                    <option value="">Seleccionar capítulo…</option>
+                <label>Capítulo
+                  <select id="chapter-number">
+                    <option value="1">1 · Capítulo 1</option>
                   </select>
                 </label>
                 <div class="chapter-plan-preview" id="chapter-plan-preview"><strong>Escolhe um capítulo.</strong><span>Verás aqui o objectivo antes de gerar.</span></div>
