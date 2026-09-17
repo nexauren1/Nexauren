@@ -153,6 +153,16 @@ function randomId(prefix) {
   return `${prefix}_${bytesToHex(bytes)}`;
 }
 
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || `item-${Date.now()}`;
+}
+
 async function bodyJson(request) {
   try {
     return await request.json();
@@ -257,12 +267,245 @@ async function authLogout(env, request) {
   );
 }
 
+async function adminApi(request, env) {
+  const admin = await requireAdmin(env, request);
+  if (!admin) return json({ error: 'Admin access required.' }, 403);
+
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const method = request.method;
+
+  if (path === '/api/admin/overview' && method === 'GET') {
+    const [books, published, drafts, review, users, orders, tools, posts] =
+      await Promise.all([
+        env.BOOKS_DB.prepare('SELECT COUNT(*) AS total FROM books').first(),
+        env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status = 'published'").first(),
+        env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status IN ('draft','research','planning','writing')").first(),
+        env.BOOKS_DB.prepare("SELECT COUNT(*) AS total FROM books WHERE status = 'review'").first(),
+        env.DB.prepare('SELECT COUNT(*) AS total FROM users').first(),
+        env.DB.prepare('SELECT COUNT(*) AS total FROM orders').first(),
+        env.DB.prepare('SELECT COUNT(*) AS total FROM tools').first(),
+        env.DB.prepare('SELECT COUNT(*) AS total FROM blog_posts').first(),
+      ]);
+
+    const revenue = await env.DB.prepare(
+      "SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS total FROM orders WHERE status IN ('COMPLETED','CAPTURED','APPROVED')",
+    ).first();
+
+    return json({
+      books: {
+        total: Number(books?.total || 0),
+        published: Number(published?.total || 0),
+        drafts: Number(drafts?.total || 0),
+        review: Number(review?.total || 0),
+      },
+      platform: {
+        users: Number(users?.total || 0),
+        orders: Number(orders?.total || 0),
+        tools: Number(tools?.total || 0),
+        posts: Number(posts?.total || 0),
+        revenue: Number(revenue?.total || 0),
+      },
+    });
+  }
+
+  if (path === '/api/admin/books' && method === 'GET') {
+    const result = await env.BOOKS_DB.prepare(
+      `SELECT id, slug, title, author, genre, price_usd, status,
+              created_at, updated_at
+         FROM books
+        ORDER BY created_at DESC
+        LIMIT 100`,
+    ).all();
+    return json({ items: result.results || [] });
+  }
+
+  if (path === '/api/admin/books' && method === 'POST') {
+    const body = await bodyJson(request);
+    const title = String(body?.title || '').trim();
+    if (!title) return json({ error: 'Book title is required.' }, 400);
+
+    const createdAt = now();
+    const id = randomId('book');
+    const slug = `${slugify(title)}-${id.slice(-6)}`;
+    const status = ['draft', 'published'].includes(body?.status)
+      ? body.status
+      : 'draft';
+    const price = Number(body?.price_usd || 0).toFixed(2);
+
+    await env.BOOKS_DB.prepare(
+      `INSERT INTO books
+        (id, slug, title, author, genre, description, price_usd,
+         language, status, created_at, updated_at, published_at, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      id,
+      slug,
+      title,
+      String(body?.author || 'Nexauren').trim() || 'Nexauren',
+      String(body?.genre || '').trim() || null,
+      String(body?.description || '').trim() || null,
+      price,
+      String(body?.language || 'en').trim() || 'en',
+      status,
+      createdAt,
+      createdAt,
+      status === 'published' ? createdAt : null,
+      admin.user_id,
+    ).run();
+
+    const productId = `prd_book_${id}`;
+    await env.DB.prepare(
+      `INSERT INTO products
+        (id, type, external_id, title, description, price_usd,
+         currency, credits, status, created_at, updated_at)
+       VALUES (?, 'book', ?, ?, ?, ?, 'USD', 0, ?, ?, ?)`,
+    ).bind(
+      productId,
+      id,
+      title,
+      String(body?.description || '').trim() || null,
+      price,
+      status === 'published' ? 'active' : 'draft',
+      createdAt,
+      createdAt,
+    ).run();
+
+    return json({ ok: true, id, slug }, 201);
+  }
+
+  if (path === '/api/admin/tools' && method === 'GET') {
+    const result = await env.DB.prepare(
+      `SELECT id, slug, title, description, category, route, status,
+              created_at, updated_at
+         FROM tools
+        ORDER BY created_at DESC
+        LIMIT 100`,
+    ).all();
+    return json({ items: result.results || [] });
+  }
+
+  if (path === '/api/admin/tools' && method === 'POST') {
+    const body = await bodyJson(request);
+    const title = String(body?.title || '').trim();
+    const route = String(body?.route || '').trim();
+    if (!title || !route) {
+      return json({ error: 'Tool name and route are required.' }, 400);
+    }
+
+    const createdAt = now();
+    const id = randomId('tool');
+    const slug = slugify(title);
+    await env.DB.prepare(
+      `INSERT INTO tools
+        (id, slug, title, description, category, route, status,
+         created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
+    ).bind(
+      id,
+      slug,
+      title,
+      String(body?.description || '').trim() || null,
+      String(body?.category || 'general').trim() || 'general',
+      route,
+      createdAt,
+      createdAt,
+    ).run();
+    return json({ ok: true, id, slug }, 201);
+  }
+
+  if (path === '/api/admin/samples' && method === 'GET') {
+    const result = await env.DB.prepare(
+      `SELECT id, type, title, description, price_usd, status,
+              created_at, updated_at
+         FROM products
+        WHERE type IN ('sample', 'midi', 'preset')
+        ORDER BY created_at DESC
+        LIMIT 100`,
+    ).all();
+    return json({ items: result.results || [] });
+  }
+
+  if (path === '/api/admin/samples' && method === 'POST') {
+    const body = await bodyJson(request);
+    const title = String(body?.title || '').trim();
+    const type = ['sample', 'midi', 'preset'].includes(body?.type)
+      ? body.type
+      : 'sample';
+    if (!title) return json({ error: 'Product name is required.' }, 400);
+
+    const createdAt = now();
+    const id = randomId('prd');
+    const price = Number(body?.price_usd || 0).toFixed(2);
+    await env.DB.prepare(
+      `INSERT INTO products
+        (id, type, title, description, price_usd, currency, credits,
+         status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'USD', 0, 'draft', ?, ?)`,
+    ).bind(
+      id,
+      type,
+      title,
+      String(body?.description || '').trim() || null,
+      price,
+      createdAt,
+      createdAt,
+    ).run();
+    return json({ ok: true, id }, 201);
+  }
+
+  if (path === '/api/admin/blog' && method === 'GET') {
+    const result = await env.DB.prepare(
+      `SELECT id, slug, title, excerpt, author_name, status,
+              created_at, updated_at, published_at
+         FROM blog_posts
+        ORDER BY created_at DESC
+        LIMIT 100`,
+    ).all();
+    return json({ items: result.results || [] });
+  }
+
+  if (path === '/api/admin/blog' && method === 'POST') {
+    const body = await bodyJson(request);
+    const title = String(body?.title || '').trim();
+    if (!title) return json({ error: 'Post title is required.' }, 400);
+
+    const createdAt = now();
+    const id = randomId('post');
+    const slug = `${slugify(title)}-${id.slice(-6)}`;
+    await env.DB.prepare(
+      `INSERT INTO blog_posts
+        (id, slug, title, excerpt, content, cover_url, author_name,
+         status, created_at, updated_at, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+    ).bind(
+      id,
+      slug,
+      title,
+      String(body?.excerpt || '').trim() || null,
+      String(body?.content || ''),
+      String(body?.cover_url || '').trim() || null,
+      String(body?.author_name || 'Nexauren').trim() || 'Nexauren',
+      createdAt,
+      createdAt,
+      admin.user_id,
+    ).run();
+    return json({ ok: true, id, slug }, 201);
+  }
+
+  return json({ error: 'Admin API route not found.' }, 404);
+}
+
 async function api(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
 
   try {
+    if (path.startsWith('/api/admin/')) {
+      return adminApi(request, env);
+    }
+
     if (path === '/api/health' && method === 'GET') {
       return json({
         ok: true,
