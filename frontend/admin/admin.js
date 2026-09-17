@@ -44,6 +44,7 @@ function setInline(id, message, kind = '') {
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: 'same-origin',
+    cache: 'no-store',
     ...options,
     headers: {
       Accept: 'application/json',
@@ -63,15 +64,38 @@ async function api(path, options = {}) {
   return data;
 }
 
-async function ensureAdmin() {
-  const data = await api('/api/auth/me');
-  if (!data.user || data.user.role !== 'admin') {
-    window.location.replace('/admin/login/');
-    return null;
+async function readAdminSession() {
+  try {
+    const data = await api('/api/auth/me');
+    if (data.user?.role === 'admin') return data.user;
+  } catch {
+    // Retry below. The login response may still be settling in the browser.
   }
-  state.user = data.user;
-  $('admin-user').textContent = data.user.email;
-  return data.user;
+  return null;
+}
+
+async function ensureAdmin() {
+  let user = await readAdminSession();
+
+  // A fresh HttpOnly cookie can occasionally take a short moment to become
+  // available after navigation on mobile browsers/CDN edges. Retry before
+  // ever sending the administrator back through the login screen.
+  if (!user) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    user = await readAdminSession();
+  }
+  if (!user) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    user = await readAdminSession();
+  }
+
+  if (!user) {
+    throw new Error('Admin session could not be confirmed.');
+  }
+
+  state.user = user;
+  $('admin-user').textContent = user.email;
+  return user;
 }
 
 function goTo(section) {
@@ -333,24 +357,39 @@ async function aiAction(action, extra = {}) {
 async function runAiButton(button) {
   const action = button.dataset.ai;
   const finish = setButtonBusy(button, true, 'A processar…');
-  setStatus(`Workers AI: ${action}…`);
+  setStatus(`Workers AI: ${action}…`, 'busy');
   try {
-    const data = await aiAction(action, {
-      chapter_number: Number($('chapter-number')?.value || 1),
-      instructions: $('chapter-instructions')?.value || '',
-    });
-    if (action === 'research') renderAi('research-view', data.report, 'RESEARCH REPORT');
-    if (action === 'story_bible') renderAi('bible-state', data.bible, 'STORY BIBLE');
-    if (action === 'outline') renderAi('bible-state', data.outline, 'OUTLINE');
-    if (action === 'chapter') renderAi('chapters-list', data.chapter, `CAPÍTULO ${data.chapter?.title || ''}`);
-    if (action === 'story_state') renderAi('world-view', data.state, 'STORY STATE');
-    if (action === 'continuity') renderAi('continuity-view', data.report, 'CONTINUITY CHECK');
-    if (action === 'qa') renderAi('qa-view', data.qa, 'BOOK QA');
-    if (action === 'originality') renderAi('originality-view', data.originality, 'ORIGINALITY CHECK');
+    const extra = {};
+    if (action === 'chapter') {
+      extra.chapter_number = Number($('chapter-number').value || 1);
+      extra.instructions = $('chapter-instructions').value.trim();
+    }
+    const data = await aiAction(action, extra);
+    if (action === 'research') renderAi('research-view', data.report, 'Research Report');
+    if (action === 'story_bible') {
+      await selectBook(state.currentBook.id, false);
+      renderAi('bible-state', data.bible, 'Story Bible');
+      goTo('bible');
+    }
+    if (action === 'outline') {
+      await selectBook(state.currentBook.id, false);
+      renderBookWorkspace();
+      setStatus('Outline gerado e guardado na Story Bible.', 'success');
+    }
+    if (action === 'chapter') {
+      await selectBook(state.currentBook.id, false);
+      goTo('chapters');
+    }
+    if (action === 'story_state') {
+      await selectBook(state.currentBook.id, false);
+      setStatus('Story State atualizado.', 'success');
+    }
+    if (action === 'continuity') renderAi('continuity-view', data.report, 'Continuity Check');
+    if (action === 'qa') renderAi('qa-view', data.qa, 'Book QA');
+    if (action === 'originality') renderAi('originality-view', data.originality, 'Originality Check');
     if (action === 'seo') renderAi('seo-view', data.seo, 'SEO');
-    await selectBook(state.currentBook.id, false);
-    await loadOverview();
-    setStatus(`Workers AI concluiu: ${action}.`, 'success');
+    setStatus(`Workers AI: ${action} concluído.`, 'success');
+    if (['continuity', 'qa', 'originality', 'seo'].includes(action)) goTo(action === 'continuity' ? 'continuity' : action);
   } catch (error) {
     setStatus(error.message, 'error');
   } finally {
@@ -358,180 +397,54 @@ async function runAiButton(button) {
   }
 }
 
-async function createBook() {
-  const form = $('book-form');
-  if (!form) throw new Error('Formulário do livro não encontrado.');
-  const body = formObject(form);
-  if (!String(body.title || '').trim()) throw new Error('O título do livro é obrigatório.');
-  const data = await api('/api/admin/books', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-  await loadBooks();
-  await selectBook(data.id, false);
-  form.reset();
-  setInline('book-form-status', `Projeto criado: ${body.title}.`, 'success');
-  return data;
-}
-
-async function registryCheck() {
-  if (!state.currentBook) throw new Error('Selecione um livro primeiro.');
-  const name = $('registry-name').value.trim();
-  if (!name) throw new Error('Indique o nome da nova entidade.');
-  let metadata = {};
-  const raw = $('registry-meta').value.trim();
-  if (raw) metadata = JSON.parse(raw);
-  const data = await api('/api/admin/registry/check', {
-    method: 'POST',
-    body: JSON.stringify({
-      book_id: state.currentBook.id,
-      entity_type: $('registry-type').value,
-      canonical_name: name,
-      metadata,
-    }),
-  });
-  const target = $('registry-result');
-  target.innerHTML = data.candidates?.length ? `
-    <div class="similarity"><strong>Possíveis semelhanças</strong><br>${data.candidates.map((item) => `${escapeHtml(item.canonical_name)} · ${Math.round(Number(item.score) * 100)}%`).join('<br>')}<br><small>${data.vectorize_enabled ? 'Vectorize configurado.' : 'Busca local de fallback; Vectorize ainda não configurado.'}</small></div>
-  ` : '<div class="notice">Nenhuma semelhança relevante encontrada nesta verificação.</div>';
-}
-
-async function registrySave() {
-  if (!state.currentBook) throw new Error('Selecione um livro primeiro.');
-  const name = $('registry-name').value.trim();
-  if (!name) throw new Error('Indique o nome da entidade.');
-  let metadata = {};
-  const raw = $('registry-meta').value.trim();
-  if (raw) metadata = JSON.parse(raw);
-  await api('/api/admin/registry', {
-    method: 'POST',
-    body: JSON.stringify({
-      book_id: state.currentBook.id,
-      entity_type: $('registry-type').value,
-      canonical_name: name,
-      metadata,
-    }),
-  });
-  $('registry-name').value = '';
-  $('registry-meta').value = '';
-  setStatus('Entidade registada.', 'success');
-}
-
-async function loadCovers(bookId) {
-  const target = $('covers-view');
-  if (!target) return;
-  const data = await api(`/api/admin/covers?book_id=${encodeURIComponent(bookId)}`);
-  if (!data.items?.length) {
-    target.innerHTML = '<div class="empty">Ainda não existem capas. Gere a primeira com Workers AI.</div>';
-    return;
-  }
-  target.innerHTML = data.items.map((cover) => `
-    <article class="cover-card">
-      <div class="cover-image cover-generated-placeholder">${Number(cover.selected) ? 'Selecionada' : 'Gerada'}</div>
-      <p>${escapeHtml(cover.model)} · ${Number(cover.selected) ? 'Selecionada' : 'Não selecionada'}</p>
-      ${Number(cover.selected) ? '' : `<button class="secondary-button" type="button" data-select-cover="${escapeHtml(cover.id)}">Escolher esta</button>`}
-    </article>
-  `).join('');
-  target.querySelectorAll('[data-select-cover]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      try {
-        await api('/api/admin/cover/select', {
-          method: 'POST',
-          body: JSON.stringify({ cover_id: button.dataset.selectCover }),
-        });
-        await selectBook(state.currentBook.id, false);
-        setStatus('Capa selecionada.', 'success');
-      } catch (error) {
-        setStatus(error.message, 'error');
-      }
-    });
-  });
-}
-
-async function savePublication() {
-  if (!state.currentBook) throw new Error('Selecione um livro primeiro.');
-  const status = document.querySelector('.status-button.active')?.dataset.status
-    || state.currentBook.status
-    || 'draft';
-  const price = Number($('publication-price').value || 0).toFixed(2);
-  await api(`/api/admin/books/${encodeURIComponent(state.currentBook.id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status, price_usd: price }),
-  });
-  await loadBooks();
-  await selectBook(state.currentBook.id, false);
-  await loadOverview();
-  setInline('publication-status-note', `Guardado: ${state.currentBook.status}.`, 'success');
-}
-
-async function refreshSection(section) {
-  if (!state.currentBook && !['dashboard', 'books', 'create', 'series', 'settings'].includes(section)) {
-    setStatus('Selecione um livro antes de abrir este módulo.', 'error');
-    return;
-  }
-  try {
-    if (section === 'dashboard') await loadOverview();
-    if (section === 'books') renderBooksList();
-    if (section === 'series') await loadSeries();
-    if (['bible', 'characters', 'world', 'timeline', 'chapters', 'files', 'publication', 'sales', 'continuity', 'qa', 'originality', 'covers', 'seo'].includes(section)) {
-      renderBookWorkspace();
-    }
-    if (section === 'settings') {
-      const data = await api('/api/admin/settings');
-      $('settings-view').innerHTML = `
-        <div class="setting-card"><span>Workers AI</span><strong class="${data.ai.configured ? 'setting-ok' : 'setting-off'}">${data.ai.configured ? 'Configurado' : 'Não configurado'}</strong></div>
-        <div class="setting-card"><span>Text model</span><strong>${escapeHtml(data.ai.text_model || '—')}</strong></div>
-        <div class="setting-card"><span>Image model</span><strong>${escapeHtml(data.ai.image_model || '—')}</strong></div>
-        <div class="setting-card"><span>Vectorize</span><strong class="${data.semantic_search.configured ? 'setting-ok' : 'setting-off'}">${data.semantic_search.configured ? 'Configurado' : 'Opcional / não ligado'}</strong></div>
-        <div class="setting-card"><span>Embeddings</span><strong>${escapeHtml(data.semantic_search.embedding_model || '—')}</strong></div>
-        <div class="setting-card"><span>Ficheiros</span><strong>PDF + EPUB sob pedido</strong></div>
-      `;
-    }
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-}
-
-tabs.forEach((tab) => {
-  tab.addEventListener('click', async () => {
-    const section = tab.dataset.section;
-    tabs.forEach((item) => item.classList.toggle('active', item === tab));
-    views.forEach((view) => view.classList.toggle('hidden', view.id !== `section-${section}`));
-    await refreshSection(section);
-    if (section === 'create') $('book-form')?.querySelector('input')?.focus();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+document.querySelectorAll('.ai-action').forEach((button) => {
+  button.addEventListener('click', () => runAiButton(button));
 });
 
 document.querySelectorAll('[data-go]').forEach((button) => {
   button.addEventListener('click', () => goTo(button.dataset.go));
 });
 
-['book-context', 'mobile-book-context'].forEach((id) => {
-  $(id)?.addEventListener('change', async (event) => {
-    try { await selectBook(event.target.value); } catch (error) { setStatus(error.message, 'error'); }
-  });
+$('book-context')?.addEventListener('change', async (event) => {
+  try { await selectBook(event.target.value); } catch (error) { setStatus(error.message, 'error'); }
+});
+$('mobile-book-context')?.addEventListener('change', async (event) => {
+  try { await selectBook(event.target.value); } catch (error) { setStatus(error.message, 'error'); }
 });
 
 $('book-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const button = event.currentTarget.querySelector('button[type="submit"]');
   const finish = setButtonBusy(button, true, 'A guardar…');
+  setInline('book-form-status', 'A guardar projeto…');
   try {
-    await createBook();
-    goTo('dashboard');
+    const body = formObject(event.currentTarget);
+    const data = await api('/api/admin/books', { method: 'POST', body: JSON.stringify(body) });
+    setInline('book-form-status', 'Livro criado. A carregar o workspace…', 'success');
+    event.currentTarget.reset();
+    await loadBooks();
+    await selectBook(data.id);
+    goTo('bible');
   } catch (error) {
     setInline('book-form-status', error.message, 'error');
   } finally { finish(); }
 });
 
-$('create-and-research')?.addEventListener('click', async (event) => {
-  const finish = setButtonBusy(event.currentTarget, true, 'A criar + analisar…');
+$('create-and-research')?.addEventListener('click', async () => {
+  const form = $('book-form');
+  if (!form.reportValidity()) return;
+  const button = $('create-and-research');
+  const finish = setButtonBusy(button, true, 'A criar e pesquisar…');
+  setInline('book-form-status', 'A criar o projeto e iniciar o Research Agent…');
   try {
-    await createBook();
+    const data = await api('/api/admin/books', { method: 'POST', body: JSON.stringify(formObject(form)) });
+    form.reset();
+    await loadBooks();
+    await selectBook(data.id);
+    const research = await aiAction('research');
+    renderAi('research-view', research.report, 'Research Report');
+    setInline('book-form-status', 'Projeto criado e Research Report guardado.', 'success');
     goTo('bible');
-    const button = document.querySelector('[data-ai="research"]');
-    if (button) await runAiButton(button);
   } catch (error) {
     setInline('book-form-status', error.message, 'error');
   } finally { finish(); }
@@ -539,82 +452,180 @@ $('create-and-research')?.addEventListener('click', async (event) => {
 
 $('series-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const button = event.currentTarget.querySelector('button[type="submit"]');
-  const finish = setButtonBusy(button, true, 'A criar…');
   try {
     await api('/api/admin/series', { method: 'POST', body: JSON.stringify(formObject(event.currentTarget)) });
     event.currentTarget.reset();
     await loadSeries();
     setStatus('Série criada.', 'success');
   } catch (error) { setStatus(error.message, 'error'); }
-  finally { finish(); }
-});
-
-document.querySelectorAll('.ai-action').forEach((button) => {
-  button.addEventListener('click', () => runAiButton(button));
 });
 
 $('canon-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!state.currentBook) return setStatus('Selecione um livro primeiro.', 'error');
-  const button = event.currentTarget.querySelector('button[type="submit"]');
-  const finish = setButtonBusy(button, true, 'A guardar…');
+  const body = formObject(event.currentTarget);
+  body.book_id = state.currentBook.id;
+  body.immutable = body.immutable ? true : false;
   try {
-    await api('/api/admin/canon', { method: 'POST', body: JSON.stringify({ book_id: state.currentBook.id, ...formObject(event.currentTarget) }) });
+    await api('/api/admin/canon', { method: 'POST', body: JSON.stringify(body) });
     await selectBook(state.currentBook.id, false);
-    setStatus('Canon atualizado e versão guardada.', 'success');
+    setStatus('Facto canónico guardado.', 'success');
   } catch (error) { setStatus(error.message, 'error'); }
-  finally { finish(); }
 });
 
 $('registry-check')?.addEventListener('click', async () => {
-  try { await registryCheck(); } catch (error) { setStatus(error.message, 'error'); }
+  if (!state.currentBook) return setStatus('Selecione um livro primeiro.', 'error');
+  const name = $('registry-name').value.trim();
+  if (!name) return setStatus('Informe o nome da entidade.', 'error');
+  let metadata = {};
+  try { metadata = JSON.parse($('registry-meta').value || '{}'); } catch { return setStatus('Os metadados precisam ser JSON válido.', 'error'); }
+  try {
+    const data = await api('/api/admin/registry/check', { method: 'POST', body: JSON.stringify({
+      book_id: state.currentBook.id,
+      entity_type: $('registry-type').value,
+      canonical_name: name,
+      metadata,
+    }) });
+    const result = $('registry-result');
+    result.innerHTML = data.candidates?.length
+      ? `<div class="notice"><strong>Possíveis semelhanças</strong>${data.candidates.map((item) => `<p>${escapeHtml(item.canonical_name)} · ${Math.round(item.score * 100)}%</p>`).join('')}</div>`
+      : '<div class="notice">Nenhuma semelhança relevante encontrada no registo local.</div>';
+  } catch (error) { setStatus(error.message, 'error'); }
 });
+
 $('registry-save')?.addEventListener('click', async () => {
-  try { await registrySave(); } catch (error) { setStatus(error.message, 'error'); }
+  if (!state.currentBook) return setStatus('Selecione um livro primeiro.', 'error');
+  const name = $('registry-name').value.trim();
+  if (!name) return setStatus('Informe o nome da entidade.', 'error');
+  let metadata = {};
+  try { metadata = JSON.parse($('registry-meta').value || '{}'); } catch { return setStatus('Os metadados precisam ser JSON válido.', 'error'); }
+  try {
+    await api('/api/admin/registry', { method: 'POST', body: JSON.stringify({
+      book_id: state.currentBook.id,
+      entity_type: $('registry-type').value,
+      canonical_name: name,
+      metadata,
+    }) });
+    setStatus('Entidade registada.', 'success');
+    $('registry-name').value = '';
+    $('registry-meta').value = '';
+  } catch (error) { setStatus(error.message, 'error'); }
 });
 
 $('cover-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!state.currentBook) return setStatus('Selecione um livro primeiro.', 'error');
-  const button = event.currentTarget.querySelector('button[type="submit"]');
+  const button = event.currentTarget.querySelector('button');
   const finish = setButtonBusy(button, true, 'A gerar capa…');
   try {
-    await api('/api/admin/cover', {
-      method: 'POST',
-      body: JSON.stringify({ book_id: state.currentBook.id, ...formObject(event.currentTarget) }),
-    });
-    event.currentTarget.reset();
+    const body = formObject(event.currentTarget);
+    const data = await api('/api/admin/cover', { method: 'POST', body: JSON.stringify({
+      book_id: state.currentBook.id,
+      prompt: body.prompt,
+    }) });
     await loadCovers(state.currentBook.id);
-    setStatus('Capa gerada com Workers AI.', 'success');
+    setStatus(`Capa ${data.id} gerada.`, 'success');
   } catch (error) { setStatus(error.message, 'error'); }
   finally { finish(); }
+});
+
+async function loadCovers(bookId) {
+  const target = $('covers-view');
+  if (!target) return;
+  const data = await api(`/api/admin/covers?book_id=${encodeURIComponent(bookId)}`);
+  if (!data.items?.length) {
+    target.innerHTML = '<div class="empty">Ainda não existem capas geradas.</div>';
+    return;
+  }
+  target.innerHTML = data.items.map((cover) => `
+    <article class="cover-card ${Number(cover.selected) ? 'selected' : ''}">
+      <div class="cover-preview" data-cover-id="${escapeHtml(cover.id)}"></div>
+      <div><strong>${Number(cover.selected) ? 'Selecionada' : 'Capa gerada'}</strong><span>${escapeHtml(cover.model)}</span></div>
+      ${Number(cover.selected) ? '' : `<button class="secondary-button choose-cover" data-cover-id="${escapeHtml(cover.id)}" type="button">Escolher</button>`}
+    </article>
+  `).join('');
+  const previews = [...target.querySelectorAll('.cover-preview')];
+  const response = await Promise.all(data.items.map(async (item) => {
+    const raw = await api(`/api/admin/covers/preview?cover_id=${encodeURIComponent(item.id)}`);
+    return { id: item.id, data_uri: raw.data_uri };
+  }));
+  for (const item of response) {
+    const node = target.querySelector(`[data-cover-id="${CSS.escape(item.id)}"]`);
+    if (node) node.style.backgroundImage = `url('${item.data_uri}')`;
+  }
+  target.querySelectorAll('.choose-cover').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await api('/api/admin/cover/select', { method: 'POST', body: JSON.stringify({ cover_id: button.dataset.coverId }) });
+        await selectBook(state.currentBook.id, false);
+        setStatus('Capa selecionada.', 'success');
+      } catch (error) { setStatus(error.message, 'error'); }
+    });
+  });
+}
+
+$('save-publication')?.addEventListener('click', async () => {
+  if (!state.currentBook) return setStatus('Selecione um livro primeiro.', 'error');
+  const statusButton = document.querySelector('.status-button.active');
+  const status = statusButton?.dataset.status || state.currentBook.status;
+  try {
+    const data = await api(`/api/admin/books/${encodeURIComponent(state.currentBook.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, price_usd: $('publication-price').value }),
+    });
+    state.currentBook = data.book;
+    await loadBooks();
+    await selectBook(state.currentBook.id, false);
+    setStatus('Publicação guardada.', 'success');
+  } catch (error) { setStatus(error.message, 'error'); }
 });
 
 document.querySelectorAll('.status-button').forEach((button) => {
   button.addEventListener('click', () => {
     document.querySelectorAll('.status-button').forEach((item) => item.classList.remove('active'));
     button.classList.add('active');
-    setInline('publication-status-note', `Novo estado selecionado: ${button.dataset.status}.`, '');
   });
 });
 
-$('save-publication')?.addEventListener('click', async () => {
-  try { await savePublication(); } catch (error) { setInline('publication-status-note', error.message, 'error'); }
+async function loadSettings() {
+  try {
+    const data = await api('/api/admin/settings');
+    $('settings-view').innerHTML = `
+      <article class="settings-card"><span>Workers AI</span><strong>${data.ai.configured ? 'Configurado' : 'Não configurado'}</strong><code>${escapeHtml(data.ai.text_model || '—')}</code></article>
+      <article class="settings-card"><span>Semantic search</span><strong>${data.semantic_search.configured ? 'Vectorize ligado' : 'Fallback local'}</strong><code>${escapeHtml(data.semantic_search.embedding_model || '—')}</code></article>
+      <article class="settings-card"><span>Ficheiros</span><strong>Geração sob pedido</strong><code>PDF · EPUB</code></article>
+    `;
+  } catch (error) { $('settings-view').innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; }
+}
+
+tabs.forEach((tab) => {
+  tab.addEventListener('click', async () => {
+    const section = tab.dataset.section;
+    tabs.forEach((item) => item.classList.toggle('active', item === tab));
+    views.forEach((view) => view.classList.toggle('hidden', view.id !== `section-${section}`));
+
+    if (section === 'books') await loadBooks();
+    if (section === 'series') await loadSeries();
+    if (section === 'settings') await loadSettings();
+  });
 });
 
 $('logout')?.addEventListener('click', async () => {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
   window.location.replace('/admin/login/');
 });
 
 (async () => {
   try {
     const user = await ensureAdmin();
-    if (!user) return;
     await Promise.all([loadOverview(), loadBooks()]);
-    setStatus(`Ligado como ${user.email}. Books Studio está pronto.`, 'success');
-  } catch {
-    window.location.replace('/admin/login/');
+    setStatus(`Admin ligado: ${user.email}`, 'success');
+  } catch (error) {
+    $('admin-user').textContent = 'Session unavailable';
+    setStatus(error.message, 'error');
   }
 })();
