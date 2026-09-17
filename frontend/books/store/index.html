@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Browse the Nexauren Books digital catalogue by title, author and category.">
+  <title>Store — Nexauren Books</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../books.css">
+  <style>
+    .store-head{padding:70px 0 34px}.store-head h1{font-family:"Playfair Display",serif;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.045em;line-height:1;margin:0}.store-head p{max-width:620px;color:var(--muted)}.store-tools{display:grid;grid-template-columns:1fr auto;gap:.8rem;margin-top:2rem}.search{min-height:50px;border:1px solid var(--line);border-radius:999px;background:var(--white);padding:0 1rem;font:inherit;color:var(--ink);width:100%}.filter{min-height:50px;border:1px solid var(--line);border-radius:999px;background:var(--white);padding:0 1rem;font:inherit;color:var(--ink)}.store-note{margin:1rem 0 80px;padding:.9rem 1rem;border:1px solid var(--line);border-radius:16px;background:#f0eae1;color:#6f6a65;font-size:.82rem}.catalog-empty{padding:5rem 2rem;text-align:center;border:1px dashed #d7cab9;border-radius:28px;background:rgba(255,253,249,.5)}.catalog-empty h2{font-family:"Playfair Display",serif;font-size:2.2rem;margin:.5rem 0}.catalog-empty p{max-width:540px;margin:.5rem auto 0;color:var(--muted)}.store-footer{margin-top:100px}
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="books-header"><div class="book-shell nav-row"><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><nav class="books-nav" aria-label="Books navigation"><a href="../">Home</a><a class="active" aria-current="page" href="./">Store</a><a href="../#categories">Categories</a><a href="../#how-it-works">About Books</a></nav><a class="books-account" href="../../account/">My account</a></div></header>
+  <main id="main"><section class="book-shell store-head"><p class="books-kicker">NEXAUREN BOOKS · STORE</p><h1>Find your next book.</h1><p>Search and filter the catalogue once real titles are connected to the Books publishing system.</p><div class="store-tools"><label><span class="sr-only">Search books</span><input class="search" type="search" placeholder="Search titles, authors or categories"></label><label><span class="sr-only">Sort books</span><select class="filter"><option>Featured</option><option>Newest</option><option>Price: low to high</option><option>Price: high to low</option></select></label></div></section><section class="book-shell"><div class="store-note">Catalogue is empty in this foundation build. This prevents placeholder books from appearing as products for sale.</div><div class="catalog-empty"><div class="empty-mark" aria-hidden="true" style="margin:0 auto">✦</div><h2>Your catalogue starts here.</h2><p>When the Books admin publishes a title, product cards can appear here with cover, author, description, price, formats, preview and purchase actions.</p></div></section></main>
+  <footer class="books-footer store-footer"><div class="book-shell books-footer-grid"><div><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><p>Focused on books, from discovery to digital delivery.</p></div><div><h3>Books</h3><a href="../">Home</a><a href="./">Store</a><a href="../#categories">Categories</a></div><div><h3>Account</h3><a href="../../account/">My account</a><a href="../../">Nexauren home</a></div><div><h3>Legal</h3><a href="../../legal/privacy.html">Privacy</a><a href="../../legal/terms.html">Terms</a><a href="../../legal/cookies.html">Cookies</a></div></div><div class="book-shell books-footer-bottom"><span>© <span id="year"></span> Nexauren Books</span><span>Store foundation</span></div></footer>
+  <script>document.getElementById('year').textContent=new Date().getFullYear();</script>
+</body>
+</html>
