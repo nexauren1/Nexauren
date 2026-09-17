@@ -22,7 +22,12 @@ frontend/
 ├── books/
 │   ├── index.html
 │   ├── books.css
-│   └── books.js
+│   ├── books.js
+│   ├── store/index.html
+│   ├── categories/index.html
+│   ├── book/index.html
+│   ├── library/index.html
+│   └── admin/index.html
 ├── music/
 │   └── index.html
 ├── tools/
@@ -42,7 +47,15 @@ frontend/
     └── home.js
 ```
 
+## Architecture decisions
+
+Books is a separate experience inside the same Nexauren platform. It does not display Music or Tools activity in its navigation or content areas.
+
+The account is shared across the platform, while Books has its own Store, Categories, Library, product-page template and Admin workspace.
+
 The current frontend is intentionally static. Authentication, the existing payment system and production API routes should be connected from the working backend after its structure is mapped, rather than recreated with placeholder integrations.
+
+No storage provider is assumed in this foundation. File storage will be selected later.
 
 ## Design principles
 
@@ -50,4 +63,5 @@ The current frontend is intentionally static. Authentication, the existing payme
 - strong contrast and visible focus states;
 - responsive navigation and mobile layouts;
 - clear page titles and section hierarchy;
-- Books does not display Music or Tools activity inside the Books experience.
+- Books does not display Music or Tools activity inside the Books experience;
+- no fake live catalogue products.
