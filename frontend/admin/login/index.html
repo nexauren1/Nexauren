@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Nexauren Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../admin.css">
+</head>
+<body class="admin-auth-page">
+  <main class="auth-shell">
+    <a class="admin-brand" href="../../">NEXAUREN <span>ADMIN</span></a>
+    <section class="auth-card" aria-labelledby="title">
+      <p class="eyebrow">PRIVATE ACCESS</p>
+      <h1 id="title">Admin Studio</h1>
+      <p class="auth-lead">Use the email and password of an account that has the <strong>admin</strong> role.</p>
+      <form id="admin-login-form" class="auth-form">
+        <label>Email<input id="email" name="email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="password" name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary-button" type="submit">Enter Admin Studio</button>
+        <p id="login-status" class="form-status" role="status" aria-live="polite"></p>
+      </form>
+      <div class="auth-trust"><span>Server-checked</span><span>HttpOnly session</span><span>Role protected</span></div>
+    </section>
+    <a class="back-link" href="../../">Return to Nexauren</a>
+  </main>
+  <script src="./login.js"></script>
+</body>
+</html>
