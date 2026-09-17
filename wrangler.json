@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nexauren",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-17",
+  "assets": {
+    "directory": "./frontend",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*",
+      "/admin*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nexauren-db",
+      "database_id": "fb3b3106-59a9-4b96-b28a-9559e0ed344d",
+      "migrations_dir": "migrations/global"
+    },
+    {
+      "binding": "BOOKS_DB",
+      "database_name": "nexauren-books",
+      "database_id": "887e6775-e3ad-43a6-b315-8193f7c6c346",
+      "migrations_dir": "migrations/books"
+    }
+  ]
+}
