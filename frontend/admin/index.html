@@ -19,56 +19,20 @@
     </div>
   </header>
   <main class="shell admin-main">
-    <section class="hero">
-      <div><p class="eyebrow">PRIVATE CONTROL CENTER</p><h1>Admin Studio.</h1><p>One internal workspace for Books, future Tools, Samples & Music, and the Nexauren Blog.</p></div>
-    </section>
-    <section class="metrics" aria-label="Nexauren overview">
-      <article class="metric"><small>Books</small><strong id="m-books">—</strong></article>
-      <article class="metric"><small>Published</small><strong id="m-published">—</strong></article>
-      <article class="metric"><small>Users</small><strong id="m-users">—</strong></article>
-      <article class="metric"><small>Orders</small><strong id="m-orders">—</strong></article>
-      <article class="metric"><small>Tools</small><strong id="m-tools">—</strong></article>
-      <article class="metric"><small>Blog posts</small><strong id="m-posts">—</strong></article>
-    </section>
+    <section class="hero"><div><p class="eyebrow">PRIVATE CONTROL CENTER</p><h1>Admin Studio.</h1><p>One internal workspace for Books, future Tools, Samples & Music, and the Nexauren Blog.</p></div></section>
+    <section class="metrics" aria-label="Nexauren overview"><article class="metric"><small>Books</small><strong id="m-books">—</strong></article><article class="metric"><small>Published</small><strong id="m-published">—</strong></article><article class="metric"><small>Users</small><strong id="m-users">—</strong></article><article class="metric"><small>Orders</small><strong id="m-orders">—</strong></article><article class="metric"><small>Tools</small><strong id="m-tools">—</strong></article><article class="metric"><small>Blog posts</small><strong id="m-posts">—</strong></article></section>
     <div class="layout">
-      <aside class="side" aria-label="Admin sections">
-        <button class="tab active" data-section="overview"><b>⌂</b> Overview</button>
-        <button class="tab" data-section="books"><b>▣</b> Books</button>
-        <button class="tab" data-section="tools"><b>⌘</b> Tools</button>
-        <button class="tab" data-section="samples"><b>♫</b> Samples & Music</button>
-        <button class="tab" data-section="blog"><b>✎</b> Blog</button>
-      </aside>
+      <aside class="side" aria-label="Admin sections"><button class="tab active" data-section="overview"><b>⌂</b> Overview</button><button class="tab" data-section="books"><b>▣</b> Books</button><button class="tab" data-section="tools"><b>⌘</b> Tools</button><button class="tab" data-section="samples"><b>♫</b> Samples & Music</button><button class="tab" data-section="blog"><b>✎</b> Blog</button></aside>
       <section class="workspace">
-        <section id="section-overview" class="panel section-view">
-          <h2>Platform overview</h2><p class="panel-intro">The public website remains separate from this workspace. Only accounts with the admin role reach these pages.</p>
-          <div class="status-row"><div class="status-box"><span>Books in creation</span><strong id="s-drafts">—</strong></div><div class="status-box"><span>Books in review</span><strong id="s-review">—</strong></div><div class="status-box"><span>Published books</span><strong id="s-published">—</strong></div><div class="status-box"><span>Revenue</span><strong id="s-revenue">—</strong></div></div>
-          <div class="panel-grid"><article class="quick-card"><h3>Books workflow</h3><p>Idea → research → Story Bible → planning → writing → continuity → QA → publication.</p></article><article class="quick-card"><h3>Commerce</h3><p>Accounts, purchases, credits and PayPal orders live in the global D1. Book content lives only in the Books D1.</p></article></div>
-          <div id="overview-notice" class="notice" style="margin-top:16px">Loading platform data…</div>
-        </section>
+        <section id="section-overview" class="panel section-view"><h2>Platform overview</h2><p class="panel-intro">The public website remains separate from this workspace. Only accounts with the admin role reach these pages.</p><div class="status-row"><div class="status-box"><span>Books in creation</span><strong id="s-drafts">—</strong></div><div class="status-box"><span>Books in review</span><strong id="s-review">—</strong></div><div class="status-box"><span>Published books</span><strong id="s-published">—</strong></div><div class="status-box"><span>Revenue</span><strong id="s-revenue">—</strong></div></div><div class="panel-grid"><article class="quick-card"><h3>Books workflow</h3><p>Idea → research → Story Bible → planning → writing → continuity → QA → publication.</p></article><article class="quick-card"><h3>Commerce</h3><p>Accounts, purchases, credits and PayPal orders live in the global D1. Book content lives only in the Books D1.</p></article></div><div id="overview-notice" class="notice" style="margin-top:16px">Loading platform data…</div></section>
 
-        <section id="section-books" class="panel section-view hidden">
-          <h2>Books</h2><p class="panel-intro">Manage book projects and create the public commerce record without exposing internal editorial data.</p>
-          <form id="book-form" class="create-form"><input class="admin-input" name="title" placeholder="Book title" required><input class="admin-input" name="author" placeholder="Author"><input class="admin-input" name="genre" placeholder="Genre"><input class="admin-input" name="price_usd" type="number" min="0" step="0.01" placeholder="Price USD"><textarea class="admin-textarea wide" name="description" placeholder="Short public description"></textarea><button class="action-button wide" type="submit">Create book project</button></form>
-          <div id="books-list" class="list" style="margin-top:16px"></div>
-        </section>
+        <section id="section-books" class="panel section-view hidden"><h2>Books</h2><p class="panel-intro">Create a book project and its matching commerce record. Draft is the default; Published immediately makes the title visible in the public store.</p><form id="book-form" class="create-form"><input class="admin-input" name="title" placeholder="Book title" required><input class="admin-input" name="author" placeholder="Author"><input class="admin-input" name="genre" placeholder="Genre"><input class="admin-input" name="price_usd" type="number" min="0" step="0.01" placeholder="Price USD"><select class="admin-select" name="status"><option value="draft">Draft</option><option value="published">Published</option></select><input class="admin-input" name="language" value="en" placeholder="Language"><textarea class="admin-textarea wide" name="description" placeholder="Short public description"></textarea><button class="action-button wide" type="submit">Create book project</button></form><div id="books-list" class="list" style="margin-top:16px"></div></section>
 
-        <section id="section-tools" class="panel section-view hidden">
-          <h2>Tools</h2><p class="panel-intro">Register future Nexauren tools here. Tool code can live in its own URL under <code>/tools/</code>.</p>
-          <form id="tool-form" class="create-form"><input class="admin-input" name="title" placeholder="Tool name" required><input class="admin-input" name="category" placeholder="Category"><input class="admin-input wide" name="route" placeholder="/tools/category/slug/"><textarea class="admin-textarea wide" name="description" placeholder="Public description"></textarea><button class="action-button wide" type="submit">Add tool</button></form>
-          <div id="tools-list" class="list" style="margin-top:16px"></div>
-        </section>
+        <section id="section-tools" class="panel section-view hidden"><h2>Tools</h2><p class="panel-intro">Register future Nexauren tools here. Tool code can live in its own URL under <code>/tools/</code>.</p><form id="tool-form" class="create-form"><input class="admin-input" name="title" placeholder="Tool name" required><input class="admin-input" name="category" placeholder="Category"><input class="admin-input wide" name="route" placeholder="/tools/category/slug/"><textarea class="admin-textarea wide" name="description" placeholder="Public description"></textarea><button class="action-button wide" type="submit">Add tool</button></form><div id="tools-list" class="list" style="margin-top:16px"></div></section>
 
-        <section id="section-samples" class="panel section-view hidden">
-          <h2>Samples & Music</h2><p class="panel-intro">Prepare sample packs, MIDI and presets for the future Nexauren music storefront.</p>
-          <form id="sample-form" class="create-form"><input class="admin-input" name="title" placeholder="Product name" required><select class="admin-select" name="type"><option value="sample">Sample Pack</option><option value="midi">MIDI</option><option value="preset">Preset</option></select><input class="admin-input" name="price_usd" type="number" min="0" step="0.01" placeholder="Price USD"><textarea class="admin-textarea wide" name="description" placeholder="Product description"></textarea><button class="action-button wide" type="submit">Add product</button></form>
-          <div id="samples-list" class="list" style="margin-top:16px"></div>
-        </section>
+        <section id="section-samples" class="panel section-view hidden"><h2>Samples & Music</h2><p class="panel-intro">Prepare sample packs, MIDI and presets for the future Nexauren music storefront.</p><form id="sample-form" class="create-form"><input class="admin-input" name="title" placeholder="Product name" required><select class="admin-select" name="type"><option value="sample">Sample Pack</option><option value="midi">MIDI</option><option value="preset">Preset</option></select><input class="admin-input" name="price_usd" type="number" min="0" step="0.01" placeholder="Price USD"><textarea class="admin-textarea wide" name="description" placeholder="Product description"></textarea><button class="action-button wide" type="submit">Add product</button></form><div id="samples-list" class="list" style="margin-top:16px"></div></section>
 
-        <section id="section-blog" class="panel section-view hidden">
-          <h2>Blog</h2><p class="panel-intro">Create drafts now and publish them later through the public blog experience.</p>
-          <form id="blog-form" class="create-form"><input class="admin-input wide" name="title" placeholder="Post title" required><input class="admin-input" name="author_name" placeholder="Author"><input class="admin-input" name="cover_url" placeholder="Cover URL"><input class="admin-input wide" name="excerpt" placeholder="Excerpt"><textarea class="admin-textarea wide" name="content" placeholder="Post content"></textarea><button class="action-button wide" type="submit">Save draft</button></form>
-          <div id="blog-list" class="list" style="margin-top:16px"></div>
-        </section>
+        <section id="section-blog" class="panel section-view hidden"><h2>Blog</h2><p class="panel-intro">Create drafts now and publish them later through the public blog experience.</p><form id="blog-form" class="create-form"><input class="admin-input wide" name="title" placeholder="Post title" required><input class="admin-input" name="author_name" placeholder="Author"><input class="admin-input" name="cover_url" placeholder="Cover URL"><input class="admin-input wide" name="excerpt" placeholder="Excerpt"><textarea class="admin-textarea wide" name="content" placeholder="Post content"></textarea><button class="action-button wide" type="submit">Save draft</button></form><div id="blog-list" class="list" style="margin-top:16px"></div></section>
       </section>
     </div>
   </main>
