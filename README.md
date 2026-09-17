@@ -1,67 +1,127 @@
 # Nexauren
 
-New clean foundation for the Nexauren platform.
+Clean foundation for the Nexauren platform.
 
-## Current direction
+## Current architecture
 
-The project starts with **Nexauren Books**. Books is a focused experience with its own navigation, visual language and content model. Music and Tools are prepared as separate future experiences.
+Nexauren is one platform with separate public experiences:
 
-The platform concept is:
+- **Books** — publishing, catalogue, sales and digital delivery.
+- **Music / Samples** — future commerce experience.
+- **Tools** — future utilities and AI tools.
+- **Blog** — future editorial content.
+- **Account** — one shared identity across Nexauren.
+- **Admin Studio** — private control center at `/admin`.
 
-- one Nexauren account;
-- separate experiences for Books, Music and Tools;
-- shared platform infrastructure only where it makes sense;
-- no storage provider is locked in yet;
-- no invented live products in the catalogue.
+The public experiences keep their own navigation and content. Admin is never linked from the public interface.
+
+## Cloudflare Worker
+
+`worker.js` is the server layer for authentication, sessions, admin authorization, Books APIs and PayPal Checkout.
+
+`wrangler.json` binds two separate D1 databases:
+
+```text
+DB
+└── nexauren-db
+    ├── users / sessions
+    ├── products / orders / purchases
+    ├── credits / subscriptions
+    ├── tools
+    └── blog_posts
+
+BOOKS_DB
+└── nexauren-books
+    ├── books
+    ├── story_bibles
+    ├── research_notes
+    ├── canonical_facts
+    ├── chapter_versions
+    ├── book_files
+    ├── entity_registry
+    ├── continuity_checks
+    ├── qa_runs
+    └── publication_versions
+```
+
+`BOOKS_DB` contains Books editorial data only. Account, commerce and shared platform records stay in `DB`.
 
 ## Frontend layout
 
 ```text
 frontend/
 ├── index.html
+├── admin/
+│   ├── index.html
+│   ├── admin.css
+│   ├── admin.js
+│   └── login/
+│       ├── index.html
+│       └── login.js
 ├── books/
 │   ├── index.html
 │   ├── books.css
 │   ├── books.js
 │   ├── store/index.html
+│   ├── store/store.js
 │   ├── categories/index.html
 │   ├── book/index.html
-│   ├── library/index.html
-│   └── admin/index.html
+│   ├── book/book.js
+│   └── library/index.html
 ├── music/
-│   └── index.html
 ├── tools/
-│   └── index.html
 ├── account/
-│   └── index.html
-├── legal/
-│   ├── about.html
-│   ├── faq.html
-│   ├── privacy.html
-│   ├── terms.html
-│   ├── cookies.html
-│   └── legal.css
-├── styles/
-│   └── home.css
-└── scripts/
-    └── home.js
+│   ├── index.html
+│   ├── account.css
+│   ├── account.js
+│   └── credits/
+│       ├── index.html
+│       └── credits.js
+└── legal/
 ```
 
-## Architecture decisions
+## Authentication
 
-Books is a separate experience inside the same Nexauren platform. It does not display Music or Tools activity in its navigation or content areas.
+Registration and login create a server-side session stored in `nexauren-db`. The browser receives only an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie.
 
-The account is shared across the platform, while Books has its own Store, Categories, Library, product-page template and Admin workspace.
+Admin access is role-based. A normal account cannot open `/admin`; the Worker checks `role = 'admin'` before serving the private workspace or any `/api/admin/*` endpoint.
 
-The current frontend is intentionally static. Authentication, the existing payment system and production API routes should be connected from the working backend after its structure is mapped, rather than recreated with placeholder integrations.
+No admin email, password or secret is stored in frontend code.
 
-No storage provider is assumed in this foundation. File storage will be selected later.
+## PayPal
+
+Checkout uses PayPal REST Orders v2 from the Worker. The browser receives only the public client ID; the client secret stays in Cloudflare Worker secrets.
+
+The repository includes a `prd_credit_100` sandbox-ready product for an end-to-end `$1.00 USD` checkout test. Book purchases use the same server-side product/order flow after a published Books record has an active commerce record.
+
+Recurring subscription plans are represented in the schema but are intentionally not activated until PayPal plan IDs are configured.
+
+## Setup
+
+1. Bind the two existing D1 databases using `wrangler.json`.
+2. Apply `migrations/global/0001_core.sql` to `nexauren-db`.
+3. Apply `migrations/books/0001_books.sql` to `nexauren-books`.
+4. Add the Cloudflare secrets `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`. Set `PAYPAL_ENV` to `sandbox` for testing.
+5. Deploy the Worker with `npx wrangler deploy` or the connected Cloudflare deployment pipeline.
+6. Create your normal Nexauren account at `/account/`, then promote that account to admin in `nexauren-db` with:
+
+```sql
+UPDATE users
+SET role = 'admin'
+WHERE lower(email) = lower('YOUR_ADMIN_EMAIL');
+```
+
+Then open `/admin` directly. There is no public Admin link.
+
+## Storage
+
+No storage provider is assumed yet. Books metadata and file records are ready in D1, while actual PDF/EPUB file storage can be connected later without moving the Books database structure.
 
 ## Design principles
 
 - light, warm surfaces instead of black-first branding;
 - strong contrast and visible focus states;
-- responsive navigation and mobile layouts;
-- clear page titles and section hierarchy;
-- Books does not display Music or Tools activity inside the Books experience;
-- no fake live catalogue products.
+- responsive mobile layouts;
+- separate Books, Music and Tools public experiences;
+- no fake live catalogue products;
+- private administration enforced by the Worker, not by hiding frontend links.
