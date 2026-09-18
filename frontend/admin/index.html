@@ -86,7 +86,7 @@
           <div>
             <span class="eyebrow">NEXAURENBOOKS</span>
             <h1>O teu livro, sem complicações.</h1>
-            <p>Começa com uma ideia. O estúdio organiza o resto contigo, passo a passo.</p>
+            <p>Começa com a ficha do livro. A Bíblia Oficial vem primeiro; a escrita começa depois da aprovação.</p>
           </div>
           <button class="button button-primary" data-action="new-book" type="button">＋ Criar livro</button>
         </div>
@@ -153,31 +153,126 @@
       <section id="section-prepare" class="view hidden">
         <div class="page-head">
           <div>
-            <span class="eyebrow">PASSO 1 · PREPARAR</span>
-            <h1>Preparar o livro</h1>
-            <p>Não precisas de preencher género, personagens, mundo ou estilo. A IA constrói essa base a partir da tua ideia.</p>
+            <span class="eyebrow">PASSO 1 · CRIAR</span>
+            <h1>Primeiro a Bíblia Oficial. Depois o livro.</h1>
+            <p>Preenche apenas o essencial. A Nexauren cria a Bíblia Oficial primeiro, tu aprovas e só depois começa a construção do livro.</p>
           </div>
           <span class="status" id="prepare-stage">Sem livro</span>
         </div>
 
         <div id="prepare-empty" class="card empty-panel">
-          <div class="empty-icon">✦</div>
-          <h2>Vamos criar a base.</h2>
-          <p>Indica apenas duas coisas. O resto é construído automaticamente.</p>
-          <form id="book-form" class="simple-form">
+          <div class="empty-icon">Aa</div>
+          <h2>Criar novo livro</h2>
+          <p>Uma única ficha reúne a ideia, o género, o tamanho da série, o tamanho dos capítulos e os dados para publicação.</p>
+
+          <form id="book-form" class="simple-form creation-form">
+            <div class="form-section-title">Livro</div>
+
             <label>
               Título
-              <input name="title" required maxlength="180" placeholder="Ex.: A Cabeça">
+              <input name="title" required maxlength="180" placeholder="Ex.: A Última Luz">
             </label>
+
             <label>
-              Ideia do livro
-              <textarea name="premise" required maxlength="6000" placeholder="Conta a história como a imaginas. Não precisas de organizar nada."></textarea>
+              Ideia
+              <textarea name="premise" required maxlength="9000" placeholder="Conta a história como a imaginas. Não precisas de organizar personagens ou capítulos."></textarea>
             </label>
-            <div class="language-note">
-              <span>Idioma</span>
-              <strong>Português (Portugal)</strong>
+
+            <div class="form-grid">
+              <label>
+                Género
+                <select name="genre" required>
+                  <option value="">Escolher género</option>
+                  <option>Ficção</option>
+                  <option>Fantasia</option>
+                  <option>Mistério</option>
+                  <option>Romance</option>
+                  <option>Ficção científica</option>
+                  <option>Terror</option>
+                  <option>Aventura</option>
+                  <option>Poesia</option>
+                  <option>Desenvolvimento pessoal</option>
+                  <option>Educação</option>
+                  <option>Outro</option>
+                </select>
+              </label>
+
+              <label>
+                Tamanho do capítulo
+                <select name="chapter_size" required>
+                  <option value="">Escolher tamanho</option>
+                  <option value="800-1200 palavras">800–1.200 palavras</option>
+                  <option value="1200-1800 palavras">1.200–1.800 palavras</option>
+                  <option value="1800-2500 palavras">1.800–2.500 palavras</option>
+                  <option value="2500-3500 palavras">2.500–3.500 palavras</option>
+                  <option value="3500-5000 palavras">3.500–5.000 palavras</option>
+                </select>
+              </label>
             </div>
-            <button id="book-save" class="button button-primary button-wide" type="submit">Criar livro</button>
+
+            <div class="form-grid">
+              <label>
+                Série (opcional)
+                <input name="series_name" maxlength="180" placeholder="Ex.: A Cidade de Vidro">
+              </label>
+
+              <label>
+                Tamanho da série (opcional)
+                <input name="series_size" type="number" min="1" max="99" inputmode="numeric" placeholder="Ex.: 3">
+              </label>
+            </div>
+
+            <div class="form-section-title">Informações para publicação</div>
+
+            <div class="form-grid">
+              <label>
+                Autor
+                <input name="author" maxlength="120" placeholder="Nome do autor">
+              </label>
+
+              <label>
+                Idioma
+                <select name="language">
+                  <option value="pt-PT">Português (Portugal)</option>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="es">Español</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                Público
+                <input name="audience" maxlength="120" placeholder="Ex.: Jovens adultos">
+              </label>
+
+              <label>
+                Classificação etária
+                <select name="age_rating">
+                  <option value="">Não definida</option>
+                  <option>Livre</option>
+                  <option>10+</option>
+                  <option>12+</option>
+                  <option>14+</option>
+                  <option>16+</option>
+                  <option>18+</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Preço de publicação (USD)
+              <input name="price_usd" type="number" min="0" step="0.01" inputmode="decimal" value="0.00">
+            </label>
+
+            <div class="creation-note">
+              <strong>Ordem fixa</strong>
+              <span>Ficha → Bíblia Oficial → aprovação da Bíblia → estrutura → capítulos → revisão → publicação.</span>
+            </div>
+
+            <button id="book-save" class="button button-primary button-wide" type="submit">Criar projecto</button>
             <p id="book-form-status" class="inline-status" role="status"></p>
           </form>
         </div>
@@ -185,33 +280,45 @@
         <div id="prepare-book" class="hidden">
           <div class="card prepare-hero">
             <div>
-              <span class="eyebrow">LIVRO PRONTO PARA PREPARAR</span>
+              <span class="eyebrow">PROJECTO CRIADO</span>
               <h2 id="prepare-book-title">—</h2>
               <p id="prepare-book-idea">—</p>
+              <div id="prepare-book-meta" class="tags"></div>
             </div>
-            <button id="prepare-all" class="button button-primary" type="button">Preparar com IA</button>
           </div>
 
-          <div class="prepare-steps" id="prepare-steps">
-            <article class="prepare-step" data-stage="research">
-              <span class="step-number">1</span>
-              <div><strong>Pesquisa</strong><p>Contexto, referências e pontos a verificar.</p></div>
-              <span class="step-state">Por fazer</span>
-            </article>
-            <article class="prepare-step" data-stage="bible">
-              <span class="step-number">2</span>
-              <div><strong>Story Bible</strong><p>Personagens, mundo, relações, história e regras.</p></div>
-              <span class="step-state">Por fazer</span>
-            </article>
-            <article class="prepare-step" data-stage="structure">
-              <span class="step-number">3</span>
-              <div><strong>Estrutura do livro</strong><p>Folha de rosto, dedicatória, apresentação, prefácio, introdução, índice, capítulos e elementos finais.</p></div>
-              <span class="step-state">Por fazer</span>
-            </article>
+          <div class="official-bible-card card">
+            <div class="card-heading">
+              <div>
+                <span class="eyebrow">PASSO 1 · BÍBLIA OFICIAL</span>
+                <h2>Define a verdade do livro antes de escrever.</h2>
+              </div>
+              <span id="bible-lock-state" class="status">Ainda não criada</span>
+            </div>
+
+            <p class="card-copy">A Bíblia Oficial guarda personagens, relações, mundo, cronologia, estilo e regras de continuidade. Depois de aprovada, fica bloqueada e passa a ser a fonte de verdade dos capítulos.</p>
+
+            <div class="bible-actions">
+              <button id="bible-generate" class="button button-primary" type="button">Criar Bíblia Oficial</button>
+              <button id="bible-approve" class="button button-secondary" type="button" disabled>Aprovar e bloquear Bíblia</button>
+            </div>
+
+            <div id="bible-summary" class="result-box">
+              <p class="reader-empty">A Bíblia ainda não foi criada.</p>
+            </div>
+          </div>
+
+          <div class="next-book-card card">
+            <div>
+              <span class="eyebrow">PASSO 2 · CONSTRUIR O LIVRO</span>
+              <h2>Depois da Bíblia, cria a estrutura.</h2>
+              <p>O índice é criado a partir da Bíblia Oficial e respeita o tamanho definido para os capítulos.</p>
+            </div>
+            <button id="book-structure" class="button button-primary" type="button" disabled>Criar estrutura do livro</button>
           </div>
 
           <details class="advanced-box">
-            <summary>Ver informação criada pela IA</summary>
+            <summary>Ver a informação criada pela IA</summary>
             <div class="advanced-content">
               <div id="research-view" class="result-box"></div>
               <div id="bible-view" class="result-box"></div>
@@ -226,7 +333,7 @@
           <div>
             <span class="eyebrow">PASSO 2 · ESCREVER</span>
             <h1>Escrever o livro</h1>
-            <p>A estrutura define o índice e os títulos. A IA escreve um capítulo de cada vez.</p>
+            <p>A estrutura nasce da Bíblia Oficial. Depois, a IA escreve um capítulo de cada vez seguindo o canon aprovado.</p>
           </div>
           <button id="write-next" class="button button-primary" type="button">Escrever próximo capítulo</button>
         </div>
