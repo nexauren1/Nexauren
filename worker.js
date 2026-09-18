@@ -662,7 +662,12 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
   ).bind(jobId, bookId || null, action, TEXT_MODEL, started, adminId).run();
 
   try {
-    const aiRequest = (systemPrompt, userPrompt, structured = true) => env.AI.run(
+    const aiRequest = (
+      systemPrompt,
+      userPrompt,
+      structured = true,
+      maxTokens = 12000,
+    ) => env.AI.run(
       TEXT_MODEL,
       {
         messages: [
@@ -677,40 +682,85 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           : {
               type: 'json_object',
             },
-        max_tokens: 10000,
+        max_tokens: maxTokens,
         temperature: 0.1,
       },
     );
 
+    const compactRule = [
+      'A saída deve ser completa e terminar correctamente.',
+      'Mantém cada campo textual curto e directo.',
+      'Não repitas informação em várias propriedades.',
+      'Não uses markdown nem texto fora do JSON.',
+    ].join(' ');
+
     let result;
     let response;
+    let firstError;
 
     try {
-      result = await aiRequest(system, user, true);
+      result = await aiRequest(
+        system,
+        [user, compactRule].join('\\n\\n'),
+        true,
+        12000,
+      );
       response = parseAIJsonResponse(result);
-    } catch (firstError) {
+    } catch (error) {
+      firstError = error;
+    }
+
+    if (!response) {
       const retrySystem = [
         system,
         '',
-        'IMPORTANT: A resposta anterior não pôde ser lida.',
-        'Gere novamente desde o início.',
-        'Devolva APENAS um JSON válido e completo.',
-        'Não uses markdown, comentários ou texto fora do JSON.',
-        'Mantém os textos curtos para garantir que todo o JSON termina correctamente.',
-        'Não uses aspas duplas dentro de valores de texto sem as escapar.',
+        'A resposta anterior estava incompleta ou inválida.',
+        compactRule,
+        'Gera tudo novamente desde o início.',
+        'Devolve APENAS um JSON válido e completo.',
       ].join('\\n');
 
       const retryUser = [
         user,
         '',
-        'RETRY: responde novamente com JSON completo, compacto e válido.',
+        'RETRY: JSON compacto, completo e válido.',
       ].join('\\n');
 
       try {
-        result = await aiRequest(retrySystem, retryUser, false);
+        result = await aiRequest(
+          retrySystem,
+          retryUser,
+          false,
+          12000,
+        );
         response = parseAIJsonResponse(result);
       } catch (secondError) {
-        throw friendlyAIError(secondError || firstError);
+        firstError = secondError || firstError;
+      }
+    }
+
+    if (!response) {
+      const finalSystem = [
+        system,
+        '',
+        'ÚLTIMA TENTATIVA.',
+        'Responde com o JSON mínimo necessário para cumprir o schema.',
+        'Usa frases muito curtas.',
+        'Evita listas extensas.',
+        'Fecha todas as chaves e colchetes.',
+        'Não escrevas nada fora do JSON.',
+      ].join('\\n');
+
+      try {
+        result = await aiRequest(
+          finalSystem,
+          [user, 'Resposta mínima e completa.'].join('\\n\\n'),
+          false,
+          8000,
+        );
+        response = parseAIJsonResponse(result);
+      } catch (thirdError) {
+        throw friendlyAIError(thirdError || firstError);
       }
     }
 
