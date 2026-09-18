@@ -1505,10 +1505,27 @@ async function adminApi(request, env) {
     if (!fields.length) return json({ error: 'No changes supplied.' }, 400);
     fields.push('updated_at = ?');
     values.push(now(), bookId);
+
     await env.BOOKS_DB.prepare(
       `UPDATE books SET ${fields.join(', ')} WHERE id = ?`,
     ).bind(...values).run();
-    return json({ ok: true, book: await getBook(env, bookId) });
+
+    if (body && Object.prototype.hasOwnProperty.call(body, 'status')) {
+      const productStatus = body.status === 'published'
+        ? 'active'
+        : 'draft';
+
+      await env.DB.prepare(
+        `UPDATE products
+            SET status = ?, updated_at = ?
+          WHERE type = 'book' AND external_id = ?`,
+      ).bind(productStatus, now(), bookId).run();
+    }
+
+    return json({
+      ok: true,
+      book: await getBook(env, bookId),
+    });
   }
 
   if (path === '/api/admin/series' && method === 'GET') {
