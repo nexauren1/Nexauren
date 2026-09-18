@@ -666,7 +666,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       systemPrompt,
       userPrompt,
       structured = true,
-      maxTokens = 12000,
+      maxTokens = 8000,
     ) => env.AI.run(
       TEXT_MODEL,
       {
@@ -731,7 +731,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           retrySystem,
           retryUser,
           false,
-          12000,
+          7000,
         );
         response = parseAIJsonResponse(result);
       } catch (secondError) {
@@ -756,7 +756,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           finalSystem,
           [user, 'Resposta mínima e completa.'].join('\\n\\n'),
           false,
-          8000,
+          5000,
         );
         response = parseAIJsonResponse(result);
       } catch (thirdError) {
