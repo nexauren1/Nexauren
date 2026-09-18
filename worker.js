@@ -998,9 +998,20 @@ function validateAIResponse(action, response, qualityContext = null) {
 function friendlyAIError(error) {
   const message = String(error?.message || error || '').trim();
 
-  if (/json|unterminated|string/i.test(message)) {
+  if (/Bíblia Oficial|estrutura recebida|estrutura deve|capítulo recebido|capítulo \\d+|manuscrito|livro ainda/i.test(message)) {
+    return new Error(message);
+  }
+
+  if (/JSON Mode couldn't be met|json mode/i.test(message)) {
     return new Error(
-      'A IA não conseguiu concluir esta etapa correctamente. Tenta novamente.',
+      'A IA não conseguiu gerar a Bíblia/estrutura completa em JSON. ' +
+      'A Nexauren tentou uma segunda forma de geração.',
+    );
+  }
+
+  if (/unterminated string|invalid json|json\\.parse|unexpected token/i.test(message)) {
+    return new Error(
+      'A IA devolveu uma resposta incompleta. A Nexauren fez novas tentativas, mas esta geração não ficou válida.',
     );
   }
 
@@ -1028,6 +1039,8 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
       (id, book_id, action, status, model, created_at, created_by)
      VALUES (?, ?, ?, 'running', ?, ?, ?)`,
   ).bind(jobId, bookId || null, action, TEXT_MODEL, started, adminId).run();
+
+  await updateAIJobProgress(env, jobId, 1, 'Pedido recebido');
 
   try {
     const aiRequest = (
@@ -1087,10 +1100,19 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
     let firstError;
 
     try {
+      await updateAIJobProgress(
+        env,
+        jobId,
+        10,
+        action === 'story_bible'
+          ? 'A preparar a Bíblia Oficial'
+          : 'A preparar a geração',
+      );
+
       result = await aiRequest(
         system,
         [user, compactRule].join('\\n\\n'),
-        true,
+        action === 'story_bible' ? false : true,
         action === 'chapter'
           ? 9000
           : action === 'story_bible'
@@ -1104,8 +1126,22 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
         parseAIJsonResponse(result),
         qualityContext,
       );
+      await updateAIJobProgress(
+        env,
+        jobId,
+        70,
+        action === 'story_bible'
+          ? 'Bíblia gerada e validada'
+          : 'Resultado gerado e validado',
+      );
     } catch (error) {
       firstError = error;
+      await updateAIJobProgress(
+        env,
+        jobId,
+        35,
+        'A corrigir e tentar novamente',
+      );
     }
 
     if (!response) {
@@ -1113,10 +1149,14 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
         system,
         '',
         'A resposta anterior estava incompleta ou inválida.',
+        firstError?.message
+          ? 'Problema detectado: ' + firstError.message
+          : '',
+        'Corrige exactamente esse problema.',
         compactRule,
         'Gera tudo novamente desde o início.',
         'Devolve APENAS um JSON válido e completo.',
-      ].join('\\n');
+      ].filter(Boolean).join('\\n');
 
       const retryUser = [
         user,
@@ -1133,6 +1173,13 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
             : 5000;
 
       try {
+        await updateAIJobProgress(
+          env,
+          jobId,
+          45,
+          'Nova tentativa da IA',
+        );
+
         result = await aiRequest(
           retrySystem,
           retryUser,
@@ -1144,17 +1191,39 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
           parseAIJsonResponse(result),
           qualityContext,
         );
+        await updateAIJobProgress(
+          env,
+          jobId,
+          82,
+          'Segunda tentativa validada',
+        );
       } catch (secondError) {
         firstError = secondError || firstError;
+        await updateAIJobProgress(
+          env,
+          jobId,
+          60,
+          'A preparar a última tentativa',
+        );
       }
     }
 
     if (!response) {
+      await updateAIJobProgress(
+        env,
+        jobId,
+        90,
+        'Última tentativa de validação',
+      );
+
       const finalSystem = action === 'chapter'
         ? [
             system,
             '',
             'ÚLTIMA TENTATIVA.',
+            firstError?.message
+              ? 'Falha anterior que deve ser corrigida: ' + firstError.message
+              : '',
             'Gera o capítulo completo, não um resumo.',
             'Cumpre o intervalo de palavras e fecha correctamente o JSON.',
             'O campo content deve conter todo o manuscrito.',
@@ -1191,10 +1260,23 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
           parseAIJsonResponse(result),
           qualityContext,
         );
+        await updateAIJobProgress(
+          env,
+          jobId,
+          96,
+          'Resultado final validado',
+        );
       } catch (thirdError) {
         throw friendlyAIError(thirdError || firstError);
       }
     }
+
+    await updateAIJobProgress(
+      env,
+      jobId,
+      98,
+      'A guardar o resultado',
+    );
 
     await env.BOOKS_DB.prepare(
       `INSERT INTO ai_generations
@@ -1212,6 +1294,13 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
       now(),
       adminId,
     ).run();
+
+    await updateAIJobProgress(
+      env,
+      jobId,
+      100,
+      'Concluído',
+    );
 
     await env.BOOKS_DB.prepare(
       `UPDATE ai_jobs
@@ -2330,6 +2419,71 @@ async function adminApi(request, env) {
       now(),
     ).run();
     return json({ ok: true });
+  }
+
+  if (path === '/api/admin/ai/progress' && method === 'GET') {
+    const url = new URL(request.url);
+    const bookId = String(url.searchParams.get('book_id') || '').trim();
+    const action = String(url.searchParams.get('action') || '').trim();
+
+    if (!bookId || !action) {
+      return json({ error: 'book_id and action are required.' }, 400);
+    }
+
+    const job = await env.BOOKS_DB.prepare(
+      `SELECT id, action, status, error, created_at, completed_at
+         FROM ai_jobs
+        WHERE book_id = ? AND action = ?
+        ORDER BY created_at DESC
+        LIMIT 1`,
+    ).bind(bookId, action).first();
+
+    if (!job) {
+      return json({
+        found: false,
+        status: 'idle',
+        progress: 0,
+        stage: 'A iniciar',
+      });
+    }
+
+    let progress = job.status === 'completed'
+      ? 100
+      : job.status === 'failed'
+        ? 0
+        : 1;
+    let stage = job.status === 'completed'
+      ? 'Concluído'
+      : job.status === 'failed'
+        ? 'Falhou'
+        : 'A trabalhar';
+
+    const marker = String(job.error || '');
+    const match = marker.match(/^progress:(\d+)\|stage:(.*)$/);
+
+    if (match) {
+      progress = Math.max(
+        1,
+        Math.min(100, Number(match[1]) || progress),
+      );
+      stage = match[2] || stage;
+    }
+
+    return json({
+      found: true,
+      job_id: job.id,
+      action: job.action,
+      status: job.status,
+      progress,
+      stage,
+      error: job.status === 'failed'
+        ? String(job.error || '')
+        : null,
+      created_at: Number(job.created_at || 0),
+      completed_at: job.completed_at
+        ? Number(job.completed_at)
+        : null,
+    });
   }
 
   if (path === '/api/admin/ai' && method === 'POST') {
