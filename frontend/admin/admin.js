@@ -359,6 +359,7 @@ function bookStructure(book = state.currentBook) {
   const raw = book?.story_bible?.outline;
   if (Array.isArray(raw)) {
     return {
+      book_plan: {},
       front_matter: [],
       chapters: raw.filter((item) => item && Number(item.number) > 0)
         .sort((a, b) => Number(a.number) - Number(b.number)),
@@ -367,12 +368,20 @@ function bookStructure(book = state.currentBook) {
   }
   if (raw && typeof raw === 'object') {
     return {
+      book_plan: raw.book_plan
+        && typeof raw.book_plan === 'object'
+        ? raw.book_plan : {},
       front_matter: Array.isArray(raw.front_matter) ? raw.front_matter : [],
       chapters: Array.isArray(raw.chapters) ? raw.chapters : [],
       back_matter: Array.isArray(raw.back_matter) ? raw.back_matter : [],
     };
   }
-  return { front_matter: [], chapters: [], back_matter: [] };
+  return {
+    book_plan: {},
+    front_matter: [],
+    chapters: [],
+    back_matter: [],
+  };
 }
 
 function currentChapters(book = state.currentBook) {
@@ -591,9 +600,26 @@ function renderPrepare() {
   $('research-view').innerHTML =
     '<p class="reader-empty">A pesquisa não é necessária neste fluxo simples.</p>';
 
+  const structurePlan = structure.book_plan || {};
+  const planSummary = structure.chapters.length
+    ? '<div class="result-line"><strong>Plano editorial</strong><p>' +
+      '<b>' + escapeHtml(structurePlan.chapter_count || structure.chapters.length) +
+      '</b> capítulos' +
+      (structurePlan.estimated_word_count
+        ? ' · estimativa de ' + escapeHtml(structurePlan.estimated_word_count) + ' palavras'
+        : '') +
+      (structurePlan.pacing_strategy
+        ? '<br>Ritmo: ' + escapeHtml(structurePlan.pacing_strategy)
+        : '') +
+      (structurePlan.ending_strategy
+        ? '<br>Final: ' + escapeHtml(structurePlan.ending_strategy)
+        : '') +
+      '</p></div>'
+    : '';
   $('structure-view').innerHTML = structure.chapters.length
-    ? '<strong>Estrutura criada.</strong><p>' +
-      structure.chapters.length + ' capítulos planeados.</p>'
+    ? planSummary +
+      '<strong>Estrutura completa criada.</strong><p>' +
+      structure.chapters.length + ' capítulos planeados a partir da Bíblia Oficial bloqueada.</p>'
     : '<p class="reader-empty">' +
       (bibleLocked
         ? 'A estrutura ainda não foi criada.'
