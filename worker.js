@@ -548,12 +548,69 @@ const SEO_SCHEMA = {
   ],
 };
 
+function parseAIJsonResponse(result) {
+  if (result == null) {
+    throw new Error('Workers AI devolveu uma resposta vazia.');
+  }
+
+  if (result?.error) {
+    throw new Error(
+      typeof result.error === 'string'
+        ? result.error
+        : JSON.stringify(result.error),
+    );
+  }
+
+  let response = result?.response ?? result?.result?.response ?? result;
+
+  if (response && typeof response === 'object') {
+    if (response.response && typeof response.response === 'string') {
+      response = response.response;
+    } else {
+      return response;
+    }
+  }
+
+  if (typeof response !== 'string') {
+    throw new Error('Workers AI devolveu um formato de resposta inesperado.');
+  }
+
+  const text = response.trim();
+  if (!text) {
+    throw new Error('Workers AI devolveu uma resposta vazia.');
+  }
+
+  const candidates = [text];
+  const fenced = text.match(/\`\`\`(?:json)?\\s*([\\s\\S]*?)\`\`\`/i);
+  if (fenced?.[1]) candidates.push(fenced[1].trim());
+
+  const firstObject = text.indexOf('{');
+  const lastObject = text.lastIndexOf('}');
+  if (firstObject >= 0 && lastObject > firstObject) {
+    candidates.push(text.slice(firstObject, lastObject + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Tenta a próxima representação possível.
+    }
+  }
+
+  throw new Error(
+    'Workers AI não devolveu JSON válido. A resposta pode ter sido cortada; tente novamente.',
+  );
+}
+
 async function runAIJson(env, action, bookId, system, user, schema, adminId) {
   if (!env.AI) {
     throw new Error('Workers AI binding is not configured on this Worker.');
   }
+
   const jobId = randomId('job');
   const started = now();
+
   await env.BOOKS_DB.prepare(
     `INSERT INTO ai_jobs
       (id, book_id, action, status, model, created_at, created_by)
@@ -570,9 +627,11 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         type: 'json_schema',
         json_schema: schema,
       },
+      max_tokens: 8192,
+      temperature: 0.2,
     });
-    let response = result?.response ?? result;
-    if (typeof response === 'string') response = JSON.parse(response);
+
+    const response = parseAIJsonResponse(result);
 
     await env.BOOKS_DB.prepare(
       `INSERT INTO ai_generations
@@ -596,6 +655,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           SET status = 'completed', completed_at = ?, error = NULL
         WHERE id = ?`,
     ).bind(now(), jobId).run();
+
     return response;
   } catch (error) {
     await env.BOOKS_DB.prepare(
@@ -603,6 +663,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           SET status = 'failed', completed_at = ?, error = ?
         WHERE id = ?`,
     ).bind(now(), String(error?.message || error), jobId).run();
+
     throw error;
   }
 }
