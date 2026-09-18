@@ -74,6 +74,27 @@
     </aside>
 
     <section class="content">
+      <div id="creation-activity" class="creation-activity hidden"
+        role="status" aria-live="polite" aria-atomic="true">
+        <div class="creation-activity-head">
+          <span class="creation-spinner" aria-hidden="true"></span>
+          <div>
+            <span class="eyebrow">EM CRIAÇÃO</span>
+            <strong id="creation-activity-title">A preparar…</strong>
+            <p id="creation-activity-detail">O pedido foi recebido.</p>
+          </div>
+        </div>
+        <div class="creation-activity-track" aria-hidden="true">
+          <span id="creation-activity-bar"></span>
+        </div>
+        <div class="creation-activity-steps" aria-hidden="true">
+          <span id="creation-step-1">A preparar</span>
+          <span id="creation-step-2">A criar</span>
+          <span id="creation-step-3">A concluir</span>
+        </div>
+      </div>
+
+
       <div class="mobile-book">
         <label for="mobile-book-context">Livro actual</label>
         <select id="mobile-book-context">
