@@ -2651,7 +2651,7 @@ function buildPdf(
           `BT /F1 ${fontSize} Tf 1 0 0 1 ${x} ${y} Tm (`,
         ),
         pdfLiteralBytes(textValue),
-        asciiBytes(') Tj ET\\n'),
+        asciiBytes(') Tj ET\n'),
       );
     };
 
@@ -2725,7 +2725,7 @@ function buildPdf(
   objects[0] = '<< /Type /Catalog /Pages 2 0 R >>';
   objects[1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] >>`;
 
-  const header = asciiBytes('%PDF-1.4\\n%NEXAUREN\\n');
+  const header = asciiBytes('%PDF-1.4\n%NEXAUREN\n');
   const chunks = [header];
   const offsets = [0];
   let position = header.length;
@@ -2736,7 +2736,7 @@ function buildPdf(
 
     if (typeof object === 'string') {
       const body = asciiBytes(
-        `${number} 0 obj\\n${object}\\nendobj\\n`,
+        `${number} 0 obj\n${object}\nendobj\n`,
       );
       offsets[number] = position;
       chunks.push(body);
@@ -2745,9 +2745,9 @@ function buildPdf(
     }
 
     const prefix = asciiBytes(
-      `${number} 0 obj\\n<< /Length ${object.streamLength} >>\\nstream\\n`,
+      `${number} 0 obj\n<< /Length ${object.streamLength} >>\nstream\n`,
     );
-    const suffix = asciiBytes('endstream\\nendobj\\n');
+    const suffix = asciiBytes('endstream\nendobj\n');
     offsets[number] = position;
     chunks.push(prefix);
 
@@ -2762,22 +2762,22 @@ function buildPdf(
   const xrefOffset = position;
   chunks.push(
     asciiBytes(
-      `xref\\n0 ${objects.length + 1}\\n`,
+      `xref\n0 ${objects.length + 1}\n`,
     ),
   );
-  chunks.push(asciiBytes('0000000000 65535 f \\n'));
+  chunks.push(asciiBytes('0000000000 65535 f \n'));
 
   for (let i = 1; i <= objects.length; i += 1) {
     chunks.push(
       asciiBytes(
-        `${String(offsets[i]).padStart(10, '0')} 00000 n \\n`,
+        `${String(offsets[i]).padStart(10, '0')} 00000 n \n`,
       ),
     );
   }
 
   chunks.push(
     asciiBytes(
-      `trailer\\n<< /Size ${objects.length + 1} /Root 1 0 R >>\\nstartxref\\n${xrefOffset}\\n%%EOF`,
+      `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
     ),
   );
 
