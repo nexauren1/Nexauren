@@ -66,7 +66,7 @@ const NEXT_STEPS = {
     action: 'story_bible',
   },
   structure: {
-    label: 'Montar a estrutura do livro',
+    label: 'Preparar a estrutura do livro',
     copy: 'Define folha de rosto, dedicatória, apresentação, prefácio, introdução, índice e capítulos.',
     button: 'Gerar estrutura →',
     go: 'writing',
@@ -118,6 +118,16 @@ function labelFor(key) {
 
 function statusLabel(value) {
   return STATUS_LABELS[value] || String(value || '—');
+}
+
+function languageLabel(value) {
+  return ({
+    'pt-PT': 'Português (Portugal)',
+    pt: 'Português',
+    en: 'Inglês',
+    fr: 'Francês',
+    es: 'Espanhol',
+  })[value] || String(value || '—');
 }
 
 function statusClass(value) {
@@ -465,7 +475,7 @@ function renderDashboard() {
   $('book-stage').textContent = book ? statusLabel(book.status) : 'Sem livro';
   $('book-stage').className = `status-badge ${statusClass(book?.status)}`;
   const tags = [];
-  if (book?.language) tags.push(book.language === 'pt-PT' ? 'Português (Portugal)' : book.language);
+  if (book?.language) tags.push(languageLabel(book.language));
   if (book?.age_rating) tags.push(book.age_rating);
   if (book?.audience) tags.push(book.audience);
   if (book?.subgenre) tags.push(book.subgenre);
@@ -656,7 +666,14 @@ function renderChapterReader() {
   $('selected-chapter-title').textContent = `Capítulo ${chapter.chapter_number} · ${chapter.title || 'Sem título'}`;
   $('selected-chapter-meta').textContent = `versão ${chapter.version_number} · ${Number(chapter.content || '').length.toLocaleString('pt-PT')} caracteres`;
   $('selected-chapter-content').className = 'chapter-content';
-  $('selected-chapter-content').textContent = chapter.content || 'Sem conteúdo.';
+  const paragraphs = String(chapter.content || 'Sem conteúdo.')
+    .replace(/\r/g, '')
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  $('selected-chapter-content').innerHTML = paragraphs.length
+    ? paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`).join('')
+    : '<p>Sem conteúdo.</p>';
 }
 
 function renderWriting() {
@@ -797,8 +814,9 @@ async function runAiButton(button) {
       const planned = structure.chapters.find((item) => Number(item.number) === chapterNumber);
       extra.chapter_number = chapterNumber;
       extra.instructions = $('chapter-instructions').value.trim();
-      extra.language = 'pt-PT';
+      extra.language = state.currentBook?.language || 'pt-PT';
       if (planned?.title) {
+        extra.title = planned.title;
         extra.instructions = `${extra.instructions}\n\nTítulo obrigatório: ${planned.title}`.trim();
       }
     }
@@ -819,7 +837,7 @@ async function runAiButton(button) {
     }
     if (action === 'structure') {
       await selectBook(state.currentBook.id, false);
-      setStatus('Estrutura criada: pré-texto, índice, capítulos e elementos finais.', 'success');
+      setStatus('Estrutura criada: abertura, índice, capítulos e elementos finais.', 'success');
       goTo('writing');
       return;
     }

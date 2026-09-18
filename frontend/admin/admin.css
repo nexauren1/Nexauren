@@ -641,3 +641,120 @@ textarea { min-height: 116px; padding: 10px; resize: vertical; }
   .global-status { right: 9px; bottom: 9px; max-width: calc(100vw - 18px); }
   .admin-footer { padding-bottom: 18px; }
 }
+
+/* NexaurenBooks Admin — experiência clara e legível */
+:root {
+  --bg: #f5f2ec;
+  --paper: #fffefa;
+  --paper-2: #f7f4ee;
+  --ink: #1f2937;
+  --muted: #667085;
+  --line: #ded8ce;
+  --accent: #536f91;
+  --accent-dark: #3f5d7f;
+}
+body.admin-app { font-size: 15px; }
+.admin-shell { width: min(1500px, calc(100% - 28px)); }
+.admin-header { background: rgba(245, 242, 236, .96); }
+.header-row { min-height: 74px; }
+.brand-mark { width: 42px; height: 42px; }
+.sidebar { width: 232px; }
+.tab { min-height: 44px; font-size: .8rem; }
+.nav-group-label { font-size: .6rem; }
+.book-picker { padding: 11px; }
+.book-picker label, .mobile-book-bar label { font-size: .63rem; }
+.admin-select, input, select { min-height: 44px; }
+textarea { min-height: 128px; }
+.section-head { margin-bottom: 20px; }
+.section-head h1 { font-size: clamp(2.15rem, 4vw, 3.2rem); }
+.section-head p { font-size: .9rem; line-height: 1.6; }
+.card { padding: 21px; border-radius: 20px; }
+.card-head h2 { font-size: 1.5rem; }
+.card-head p, .form-grid label, .full-field, .inline-status { font-size: .76rem; }
+.primary-button, .secondary-button, .ghost-button { min-height: 44px; padding-inline: 15px; }
+.active-book-hero { padding: 26px; }
+.next-step { padding: 20px; }
+.progress-card { padding: 20px; }
+.workflow-steps strong { font-size: .76rem; }
+.workflow-steps small { font-size: .64rem; }
+.guided-step { padding: 14px; }
+.guided-step strong { font-size: .76rem; }
+.guided-step small { font-size: .64rem; }
+
+.editorial-details {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 253, 249, .72);
+  box-shadow: var(--shadow);
+}
+.editorial-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px 20px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+.editorial-details > summary::-webkit-details-marker { display: none; }
+.editorial-details > summary::after {
+  content: '+';
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  flex: 0 0 auto;
+}
+.editorial-details[open] > summary::after { content: '−'; }
+.editorial-details > summary small {
+  color: var(--muted);
+  font-weight: 500;
+}
+.editorial-details > .card,
+.editorial-details > .details-columns {
+  margin-inline: 12px;
+}
+.editorial-details > .card:last-child,
+.editorial-details > .details-columns:last-child { margin-bottom: 12px; }
+
+.chapter-content {
+  font-family: "Playfair Display", serif;
+  font-size: 1.03rem;
+  line-height: 1.9;
+  color: #293241;
+  white-space: normal;
+}
+.chapter-content p { margin: 0 0 1.05em; }
+.chapter-content p:last-child { margin-bottom: 0; }
+
+.global-status {
+  max-width: 620px;
+  font-size: .8rem;
+}
+
+@media (max-width: 980px) {
+  .app-grid { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    width: auto;
+    max-height: none;
+  }
+  .side-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-group-label { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .admin-shell { width: min(100% - 18px, 1500px); }
+  .header-row {
+    align-items: flex-start;
+    padding-block: 10px;
+  }
+  .ai-state, .user-chip { display: none; }
+  .editorial-details > summary { align-items: flex-start; }
+  .editorial-details > summary small { display: none; }
+}

@@ -344,7 +344,7 @@ function bookTitlePrompt(book) {
   return [
     `Title: ${book.title}`,
     `Subtitle: ${book.subtitle || ''}`,
-    `Language: ${book.language || 'en'}`,
+    `Language: ${book.language || 'pt-PT'}`,
     `Country/context: ${book.country_context || ''}`,
     `Genre: ${book.genre || ''}`,
     `Subgenre: ${book.subgenre || ''}`,
@@ -407,11 +407,25 @@ const STORY_BIBLE_SCHEMA = {
 const OUTLINE_SCHEMA = {
   type: 'object',
   properties: {
+    front_matter: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['type', 'title', 'included', 'content'],
+        properties: {
+          type: { type: 'string' },
+          title: { type: 'string' },
+          included: { type: 'boolean' },
+          content: { type: 'string' },
+        },
+      },
+    },
     chapters: {
       type: 'array',
       items: {
         type: 'object',
-        additionalProperties: true,
+        additionalProperties: false,
         required: [
           'number', 'title', 'objective', 'characters',
           'location', 'conflict', 'result',
@@ -427,8 +441,22 @@ const OUTLINE_SCHEMA = {
         },
       },
     },
+    back_matter: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['type', 'title', 'included', 'content'],
+        properties: {
+          type: { type: 'string' },
+          title: { type: 'string' },
+          included: { type: 'boolean' },
+          content: { type: 'string' },
+        },
+      },
+    },
   },
-  required: ['chapters'],
+  required: ['front_matter', 'chapters', 'back_matter'],
 };
 
 const CHAPTER_SCHEMA = {
@@ -548,13 +576,14 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
 
     await env.BOOKS_DB.prepare(
       `INSERT INTO ai_generations
-        (id, job_id, book_id, action, model, input_json,
+        (id, job_id, book_id, role, action, model, input_json,
          output_json, created_at, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       randomId('gen'),
       jobId,
       bookId || null,
+      action,
       action,
       TEXT_MODEL,
       JSON.stringify({ system, user: clip(user, 50000) }),
@@ -636,11 +665,19 @@ async function saveStoryBible(env, bookId, bible) {
 }
 
 async function saveOutline(env, bookId, outline) {
+  const structure = {
+    front_matter: Array.isArray(outline.front_matter)
+      ? outline.front_matter : [],
+    chapters: Array.isArray(outline.chapters)
+      ? outline.chapters : [],
+    back_matter: Array.isArray(outline.back_matter)
+      ? outline.back_matter : [],
+  };
   await env.BOOKS_DB.prepare(
     `UPDATE story_bibles
         SET chapters_json = ?, updated_at = ?
       WHERE book_id = ?`,
-  ).bind(JSON.stringify(outline.chapters || []), now(), bookId).run();
+  ).bind(JSON.stringify(structure), now(), bookId).run();
 }
 
 async function saveChapter(env, bookId, chapterNumber, chapter, adminId, instructions) {
@@ -802,25 +839,37 @@ async function adminAI(request, env, admin) {
     return json({ ok: true, action, bible });
   }
 
-  if (action === 'outline') {
-    const outline = await runAIJson(
+  if (action === 'structure' || action === 'outline') {
+    const structure = await runAIJson(
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Outline Planner. Use the current Story Bible as the source of truth. Create a chapter-by-chapter outline that can be approved before prose is generated. Never contradict locked canon. Return only JSON matching the schema.',
-      `Story Bible:\n${clip(context.story_bible, 30000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Produce a coherent outline.`,
+      'You are the NexaurenBooks Editorial Structure Planner. Build a complete, practical book structure from the Story Bible. Use European Portuguese wording when the book language is pt-PT. Return front_matter, chapters and back_matter. Consider a title page, copyright page, dedication, epigraph when appropriate, presentation, preface when appropriate, introduction when useful, and a contents/index entry. Do not force irrelevant elements: mark them included=false. The contents/index item must have empty content because the system builds it from the chapter list. Every chapter needs a stable number, a specific title, an objective, characters, location, conflict and result. Never contradict locked canon. Return only JSON matching the schema.',
+      `Book:\n${clip(base, 14000)}\n\nStory Bible:\n${clip(context.story_bible, 30000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Create the editorial structure now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
     );
-    await saveOutline(env, bookId, outline);
-    return json({ ok: true, action, outline });
+    await saveOutline(env, bookId, structure);
+    await env.BOOKS_DB.prepare(
+      `UPDATE books SET status = 'planning', updated_at = ? WHERE id = ?`,
+    ).bind(now(), bookId).run();
+    return json({ ok: true, action: 'structure', structure });
   }
 
   if (action === 'chapter') {
     const chapterNumber = Math.max(1, Number(body?.chapter_number || 1));
-    const requestedOutline = context.story_bible?.outline?.find(
+    const structure = context.story_bible?.outline;
+    const plannedChapters = Array.isArray(structure?.chapters)
+      ? structure.chapters
+      : Array.isArray(structure) ? structure : [];
+    const requestedOutline = plannedChapters.find(
       (item) => Number(item.number) === chapterNumber,
     );
+    if (!requestedOutline) {
+      return json({
+        error: 'Prepara primeiro a estrutura do livro. Este capítulo ainda não tem título nem plano.',
+      }, 400);
+    }
     const currentChapter = context.chapters.find(
       (item) => Number(item.chapter_number) === chapterNumber
         && Number(item.is_current) === 1,
@@ -830,15 +879,23 @@ async function adminAI(request, env, admin) {
         && Number(item.is_current) === 1,
     ).slice(-2);
     const instructions = String(body?.instructions || '').trim();
+    const language = String(
+      body?.language || context.language || 'pt-PT',
+    ).trim() || 'pt-PT';
+    const requestedTitle = String(
+      body?.title || requestedOutline.title || `Capítulo ${chapterNumber}`,
+    ).trim();
     const chapter = await runAIJson(
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Writer. Generate one chapter only. The Story Bible and locked canonical facts are authoritative. Follow the outline and Story State. Do not change names, ages, relationships, world rules, chronology or knowledge states. Never write future canon into the chapter simply because it would be convenient. Return only JSON.',
-      `Story Bible:\n${clip(context.story_bible, 26000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nRelevant previous chapters:\n${clip(previous, 18000)}\n\nCurrent outline:\n${clip(requestedOutline || {}, 9000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 10000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber}.`,
+      `You are the NexaurenBooks Writer. Write exactly one chapter in ${language}. The chapter title is fixed by the approved structure and must not be changed. The Story Bible, locked canonical facts and current Story State are authoritative. Follow the approved chapter plan. Do not change names, ages, relationships, world rules, chronology or knowledge states. Do not add a different chapter number. Return only JSON matching the schema. The content field must contain the chapter prose only; do not repeat the title inside content.`,
+      `Language: ${language}\n\nFixed chapter number: ${chapterNumber}\nFixed chapter title: ${requestedTitle}\n\nStory Bible:\n${clip(context.story_bible, 26000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nRelevant previous chapters:\n${clip(previous, 18000)}\n\nApproved chapter plan:\n${clip(requestedOutline, 9000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 10000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber} now.`,
       CHAPTER_SCHEMA,
       admin.user_id,
     );
+    chapter.title = requestedTitle;
+    chapter.summary = String(chapter.summary || '').trim();
     const saved = await saveChapter(
       env,
       bookId,
@@ -1097,7 +1154,7 @@ async function adminApi(request, env) {
       String(body?.subtitle || '').trim() || null,
       String(body?.author || 'Nexauren').trim() || 'Nexauren',
       String(body?.description || '').trim() || null,
-      String(body?.language || 'en').trim() || 'en',
+      String(body?.language || 'pt-PT').trim() || 'pt-PT',
       String(body?.genre || '').trim() || null,
       String(body?.subgenre || '').trim() || null,
       String(body?.audience || '').trim() || null,

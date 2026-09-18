@@ -31,31 +31,31 @@
   <main id="main" class="admin-shell app-grid">
     <aside class="sidebar">
       <div class="workspace-title">
-        <span class="eyebrow">ÁREA PRIVADA</span>
+        <span class="eyebrow">ESPAÇO PRIVADO</span>
         <strong>Books Studio</strong>
-        <small>Cria o livro sem te perderes.</small>
+        <small>Um livro de cada vez, sem complicações.</small>
       </div>
 
       <div class="book-picker">
-        <label for="book-context">Livro activo</label>
+        <label for="book-context">Livro actual</label>
         <select id="book-context" class="admin-select">
           <option value="">Seleccionar livro…</option>
         </select>
       </div>
 
       <nav class="side-nav" aria-label="Navegação do estúdio">
-        <div class="nav-group-label">Criar</div>
+        <div class="nav-group-label">O teu livro</div>
         <button class="tab active" data-section="dashboard"><span class="nav-icon">⌂</span><span>Início</span></button>
-        <button class="tab" data-section="project"><span class="nav-icon">✦</span><span>Projecto</span></button>
-        <button class="tab" data-section="writing"><span class="nav-icon">¶</span><span>Manuscrito</span></button>
+        <button class="tab" data-section="project"><span class="nav-icon">✦</span><span>Preparar</span></button>
+        <button class="tab" data-section="writing"><span class="nav-icon">¶</span><span>Escrever</span></button>
+        <button class="tab" data-section="quality"><span class="nav-icon">✓</span><span>Rever</span></button>
+        <button class="tab" data-section="production"><span class="nav-icon">↗</span><span>Publicar</span></button>
 
-        <div class="nav-group-label nav-group-spaced">Fechar</div>
-        <button class="tab" data-section="quality"><span class="nav-icon">✓</span><span>Revisão</span></button>
-        <button class="tab" data-section="production"><span class="nav-icon">↗</span><span>Publicação</span></button>
-
-        <div class="nav-group-label nav-group-spaced">Gestão</div>
-        <button class="tab" data-section="books"><span class="nav-icon">▣</span><span>Livros</span></button>
+        <div class="nav-group-label nav-group-spaced">Biblioteca</div>
+        <button class="tab" data-section="books"><span class="nav-icon">▣</span><span>Os meus livros</span></button>
         <button class="tab" data-section="series"><span class="nav-icon">◎</span><span>Séries</span></button>
+
+        <div class="nav-group-label nav-group-spaced">Administração</div>
         <button class="tab" data-section="settings"><span class="nav-icon">⚙</span><span>Sistema</span></button>
       </nav>
 
@@ -158,9 +158,9 @@
       <section id="section-project" class="view hidden">
         <div class="section-head">
           <div>
-            <span class="eyebrow">PASSO 1 · PROJECTO</span>
-            <h1 id="project-page-title">Criar o projecto</h1>
-            <p>Começa pelo essencial. Os campos avançados ficam escondidos até serem necessários.</p>
+            <span class="eyebrow">PASSO 1 · PREPARAR</span>
+            <h1 id="project-page-title">Preparar o livro</h1>
+            <p>Preenche só o que sabes. A IA ajuda a construir a pesquisa, a Story Bible e a estrutura.</p>
           </div>
           <span class="status-badge" id="project-stage">Novo projecto</span>
         </div>
@@ -179,7 +179,7 @@
               </div>
 
               <details class="advanced-details">
-                <summary>Mais opções</summary>
+                <summary>Preferências do livro (opcional)</summary>
                 <div class="form-grid details-grid">
                   <label>Subtítulo<input name="subtitle" placeholder="Opcional"></label>
                   <label>Idioma
@@ -211,7 +211,7 @@
 
             <div class="card guided-card">
               <div class="card-head">
-                <div><span class="eyebrow">A SEGUIR</span><h2>O estúdio trata do resto por etapas</h2></div>
+                <div><span class="eyebrow">ASSISTÊNCIA</span><h2>A IA prepara o próximo passo</h2><p>Não precisas de preencher a estrutura à mão.</p></div>
               </div>
               <div class="guided-grid">
                 <button type="button" class="guided-step" data-ai="research"><span>01</span><div><strong>Pesquisar</strong><small>Contexto, referências e pontos a verificar.</small></div><b>→</b></button>
@@ -234,6 +234,12 @@
             </div>
           </aside>
         </div>
+
+        <details class="editorial-details">
+          <summary>
+            <span>Ver pesquisa, Story Bible, canon e entidades</span>
+            <small>As ferramentas avançadas ficam aqui para manter o espaço simples.</small>
+          </summary>
 
         <div class="card story-card">
           <div class="card-head">
@@ -289,34 +295,36 @@
         </div>
       </section>
 
+        </details>
+
       <section id="section-writing" class="view hidden">
         <div class="section-head">
           <div>
-            <span class="eyebrow">PASSO 2 · MANUSCRITO</span>
-            <h1>Construir o livro</h1>
-            <p>A estrutura vem antes da prosa. Primeiro organizamos o livro; depois escrevemos capítulo a capítulo.</p>
+            <span class="eyebrow">PASSO 2 · ESCREVER</span>
+            <h1>Escrever o livro</h1>
+            <p>Primeiro crias a estrutura. Depois escreves os capítulos, sempre a partir do índice e da Story Bible.</p>
           </div>
           <span class="status-badge" id="writing-stage">Sem livro</span>
         </div>
 
         <div class="writing-notice card">
           <div class="notice-icon">1</div>
-          <div><strong>Primeiro estrutura. Depois capítulo.</strong><p>O livro pode ter folha de rosto, dedicatória, epígrafe, apresentação, prefácio, introdução, índice, capítulos e elementos finais.</p></div>
+          <div><strong>Primeiro a estrutura. Depois a escrita.</strong><p>O livro pode incluir folha de rosto, dedicatória, epígrafe, apresentação, prefácio, introdução, índice, capítulos e elementos finais. O sistema mantém esta ordem automaticamente.</p></div>
         </div>
 
         <div class="writing-layout">
           <div class="main-stack">
             <div class="card structure-card">
               <div class="card-head">
-                <div><span class="eyebrow">ESTRUTURA EDITORIAL</span><h2>Ordem do livro</h2><p>A IA decide quais elementos fazem sentido e mantém o índice alinhado com os capítulos.</p></div>
-                <button class="primary-button ai-action" data-ai="structure" type="button">Gerar estrutura</button>
+                <div><span class="eyebrow">1 · ESTRUTURA EDITORIAL</span><h2>Ordem do livro</h2><p>A IA prepara os elementos iniciais, o índice, os capítulos e os elementos finais.</p></div>
+                <button class="primary-button ai-action" data-ai="structure" type="button">Preparar estrutura</button>
               </div>
               <div id="structure-view" class="structure-view"><div class="empty-state">Cria a Story Bible e depois gera a estrutura.</div></div>
             </div>
 
             <div class="card chapter-control-card">
               <div class="card-head">
-                <div><span class="eyebrow">ESCRITA</span><h2>Escrever o próximo capítulo</h2><p>O título vem do plano do livro e a prosa segue o contexto actual.</p></div>
+                <div><span class="eyebrow">2 · ESCRITA</span><h2>Escrever um capítulo</h2><p>O título vem do índice. A IA escreve apenas o capítulo escolhido e respeita a Story Bible e o canon.</p></div>
                 <span class="pill" id="chapter-plan-pill">—</span>
               </div>
 
@@ -331,8 +339,8 @@
 
               <label class="full-field">Instruções opcionais<textarea id="chapter-instructions" placeholder="Ex.: dar mais espaço ao diálogo, manter o ritmo lento…"></textarea></label>
               <div class="form-actions">
-                <button class="primary-button ai-action" data-ai="chapter" type="button">Gerar capítulo</button>
-                <button class="secondary-button ai-action" data-ai="story_state" type="button">Actualizar estado</button>
+                <button class="primary-button ai-action" data-ai="chapter" type="button">Escrever capítulo</button>
+                <button class="secondary-button ai-action" data-ai="story_state" type="button">Actualizar estado da história</button>
               </div>
             </div>
 
@@ -347,7 +355,7 @@
 
           <aside class="side-stack">
             <div class="card chapter-list-card">
-              <div class="card-head"><div><span class="eyebrow">MANUSCRITO</span><h2>Capítulos</h2></div><span class="pill" id="chapter-count">0</span></div>
+              <div class="card-head"><div><span class="eyebrow">ÍNDICE</span><h2>Capítulos</h2></div><span class="pill" id="chapter-count">0</span></div>
               <div id="chapters-list" class="chapter-list"></div>
             </div>
             <div class="card mini-card">
@@ -361,7 +369,7 @@
 
       <section id="section-quality" class="view hidden">
         <div class="section-head">
-          <div><span class="eyebrow">PASSO 3 · REVISÃO</span><h1>Revisão</h1><p>Antes de publicar, confirma continuidade, qualidade geral e originalidade do catálogo interno.</p></div>
+          <div><span class="eyebrow">PASSO 3 · REVER</span><h1>Rever o livro</h1><p>Antes de publicar, confirma continuidade, qualidade geral e originalidade do catálogo interno.</p></div>
         </div>
         <div class="quality-grid">
           <article class="card quality-action"><span class="quality-icon">✓</span><div><span class="eyebrow">CONTINUIDADE</span><h2>Verificar a história</h2><p>Personagens, idades, locais, relações, conhecimento, objectos e cronologia.</p></div><button class="primary-button ai-action" data-ai="continuity" type="button">Verificar</button></article>
@@ -376,7 +384,7 @@
       </section>
 
       <section id="section-production" class="view hidden">
-        <div class="section-head"><div><span class="eyebrow">PASSO 4 · PUBLICAÇÃO</span><h1>Publicação</h1><p>Quando o manuscrito estiver pronto, trata da capa, ficheiros, SEO, preço e estado de publicação.</p></div></div>
+        <div class="section-head"><div><span class="eyebrow">PASSO 4 · PUBLICAR</span><h1>Preparar publicação</h1><p>Quando o manuscrito estiver pronto, trata da capa, ficheiros, SEO, preço e estado de publicação.</p></div></div>
 
         <div class="production-grid">
           <article class="card production-card cover-card-large">
