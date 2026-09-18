@@ -338,14 +338,19 @@ async function getBookContext(env, bookId) {
         LIMIT 1`,
     ).bind(bookId).first(),
   ]);
+  const bookMetadata = metadata
+    ? safeJsonParse(metadata.metadata_json)
+    : {};
+
   return {
     ...book,
     chapters,
     canonical_facts: facts.results || [],
     research_notes: research.results || [],
-    book_metadata: metadata
-      ? safeJsonParse(metadata.metadata_json)
-      : {},
+    book_metadata: bookMetadata,
+    series_name: bookMetadata?.creation?.series_name || '',
+    series_size: bookMetadata?.creation?.series_size || 0,
+    chapter_size: bookMetadata?.creation?.chapter_size || '',
   };
 }
 
@@ -970,7 +975,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Official Story Bible Architect. Create the official creative canon from the author inputs only. The Story Bible becomes the single source of truth for the future book. Never write chapters. Preserve the title, idea, genre, series requirements and chapter-size requirements. Define identity, premise, themes, characters, relationships, world, timeline, style, continuity rules and continuation rules. Use stable IDs. Return only JSON matching the schema.',
+      'You are the NexaurenBooks Official Story Bible Architect. Create the official creative canon from the author inputs only. The Story Bible becomes the single source of truth for the future book. Never write chapters. Preserve the title, idea, genre, series requirements and chapter-size requirements. Define identity, premise, themes, characters, relationships, world, timeline, style, continuity rules and continuation rules. Use stable IDs. For narrative fiction, include the core protagonist and other necessary characters, meaningful relationships, and at least three concrete timeline milestones. Never return empty core arrays merely to satisfy the schema. Return only JSON matching the schema.',
       `${base}\n\nBook requirements:\n- Genre: ${context.genre || 'Not specified'}\n- Series name: ${context.series_name || 'Standalone'}\n- Series size: ${context.series_size || 'Not specified'}\n- Chapter size: ${context.chapter_size || context.desired_size || 'Not specified'}\n\nCreate the Official Story Bible now.`,
       STORY_BIBLE_SCHEMA,
       admin.user_id,
