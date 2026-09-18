@@ -1,32 +1,86 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Nexauren account — one account shared across Nexauren experiences.">
-  <meta name="theme-color" content="#f5f2ec">
-  <title>Nexauren Account</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <meta name="description" content="A sua conta Nexauren Story para compras e biblioteca de livros.">
+  <title>Minha conta — Nexauren Story</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/books/books.css">
   <link rel="stylesheet" href="./account.css">
 </head>
 <body>
-  <header class="account-header"><div class="shell top"><a class="brand" href="../"><span class="mark">N</span>NEXAUREN</a><a class="back" href="../">Back to home</a></div></header>
-  <main class="shell main">
-    <section class="heading"><p class="eyebrow">ONE ACCOUNT</p><h1>Your Nexauren account.</h1><p>One identity can be used across Nexauren. Each experience keeps its own content, while your account, purchases and credits stay centralized.</p></section>
+<header class="books-header">
+  <div class="book-shell nav-row">
+    <a class="books-brand" href="/"><span class="brand-symbol">N</span><span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span></a>
+    <a class="books-account" href="/books/store/">Voltar à loja</a>
+  </div>
+</header>
 
-    <section id="guest-view" class="auth-grid">
-      <article class="card"><h2>Sign in</h2><p>Access your account, library and purchases.</p><form id="login-form" class="form"><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="button" type="submit">Sign in</button><p id="login-status" class="status" role="status" aria-live="polite"></p></form></article>
-      <article class="card"><h2>Create account</h2><p>Start with a Nexauren identity. You can use it for Books and future experiences.</p><form id="register-form" class="form"><label>Name<input name="name" type="text" autocomplete="name" maxlength="80"></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>Confirm password<input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required></label><button class="button" type="submit">Create account</button><p id="register-status" class="status" role="status" aria-live="polite"></p></form></article>
-    </section>
+<main class="book-shell auth-wrap">
+  <p class="eyebrow">NEXAUREN STORY · CONTA</p>
+  <h1 class="account-title">A sua conta, a sua biblioteca.</h1>
+  <p class="account-lead">Entre para acompanhar compras e abrir as edições digitais que pertencem à sua conta.</p>
 
-    <section id="user-view" class="dashboard hidden">
-      <article class="card"><div class="profile"><div><p class="eyebrow">ACCOUNT</p><h2 id="profile-name">Nexauren member</h2><p id="profile-email"></p></div><span id="profile-role" class="badge">user</span></div><div class="summary"><div class="summary-box"><small>Credit balance</small><strong id="credit-balance">0</strong></div><div class="summary-box"><small>Access</small><strong>Nexauren</strong></div></div><div class="links"><a class="link-button" href="../books/">Books</a><a class="link-button" href="./credits/">Buy credits</a><button id="logout" class="link-button" type="button">Sign out</button></div></article>
-      <article class="card"><h2>Your purchases</h2><p>Products you have acquired through Nexauren.</p><div id="purchases" class="purchase-list"></div></article>
-    </section>
-  </main>
-  <footer class="shell footer"><span>© <span id="year"></span> Nexauren · <a href="../legal/privacy.html">Privacy</a></span></footer>
-  <script>document.getElementById('year').textContent=new Date().getFullYear();</script>
-  <script src="./account.js"></script>
+  <section id="guest-view" class="auth-grid">
+    <article class="auth-card">
+      <h2>Entrar</h2>
+      <p>Aceda à sua biblioteca e às suas compras.</p>
+      <form id="login-form" class="form">
+        <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
+        <label>Palavra-passe<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="book-button primary" type="submit">Entrar</button>
+        <p id="login-status" class="status" role="status" aria-live="polite"></p>
+      </form>
+    </article>
+
+    <article class="auth-card">
+      <h2>Criar conta</h2>
+      <p>Crie a sua conta para guardar as compras da Nexauren Story.</p>
+      <form id="register-form" class="form">
+        <label>Nome<input name="name" type="text" autocomplete="name" maxlength="80"></label>
+        <label>E-mail<input name="email" type="email" autocomplete="email" required></label>
+        <label>Palavra-passe<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <label>Confirmar palavra-passe<input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button class="book-button terra" type="submit">Criar conta</button>
+        <p id="register-status" class="status" role="status" aria-live="polite"></p>
+      </form>
+    </article>
+  </section>
+
+  <section id="user-view" class="account-stack hidden">
+    <article class="account-card">
+      <div class="profile-row">
+        <div><p class="eyebrow">CONTA ATIVA</p><h2 id="profile-name">Leitor Nexauren</h2><p id="profile-email"></p></div>
+        <span id="profile-role" class="badge">user</span>
+      </div>
+      <div class="notice">A sua conta guarda o acesso aos livros comprados através da Nexauren Story.</div>
+      <div class="account-links">
+        <a class="book-button primary" href="/books/library/">Abrir minha biblioteca</a>
+        <a class="book-button soft" href="/books/store/">Explorar a loja</a>
+        <button id="logout" class="book-button soft" type="button">Sair</button>
+      </div>
+    </article>
+
+    <article class="account-card">
+      <h2>As suas compras</h2>
+      <p>Livros adquiridos através da Nexauren Story.</p>
+      <div id="purchases" class="purchase-list"></div>
+    </article>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="book-shell footer-grid">
+    <div><a class="books-brand" href="/"><span class="brand-symbol">N</span><span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span></a><p class="footer-note">Uma livraria digital dedicada a livros, autores e edições digitais.</p></div>
+    <div><p class="footer-title">Explorar</p><a href="/books/store/">Loja</a><a href="/books/categories/">Categorias</a><a href="/books/library/">Biblioteca</a></div>
+    <div><p class="footer-title">Story</p><a href="/legal/about.html">Sobre</a><a href="/legal/faq.html">FAQ</a><a href="/account/">Minha conta</a></div>
+    <div><p class="footer-title">Informação</p><a href="/legal/privacy.html">Privacidade</a><a href="/legal/terms.html">Termos</a></div>
+  </div>
+  <div class="book-shell footer-bottom"><span>© <span id="year"></span> Nexauren Story</span><span>Livros no centro.</span></div>
+</footer>
+<script src="/scripts/site.js"></script>
+<script src="./account.js"></script>
 </body>
 </html>

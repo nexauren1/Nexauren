@@ -1,117 +1,129 @@
-const guestView = document.getElementById('guest-view');
-const userView = document.getElementById('user-view');
-const loginForm = document.getElementById('login-form');
-const registerForm = document.getElementById('register-form');
-const logoutButton = document.getElementById('logout');
+const guestView = document.getElementById("guest-view");
+const userView = document.getElementById("user-view");
+const loginForm = document.getElementById("login-form");
+const registerForm = document.getElementById("register-form");
+const logoutButton = document.getElementById("logout");
 
 async function api(path, options) {
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Request failed.');
+  const response = await fetch(path, Object.assign({
+    credentials: "same-origin",
+    headers: { Accept: "application/json" }
+  }, options || {}));
+
+  const raw = await response.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; }
+  catch (_) { throw new Error("Resposta inválida do servidor (" + response.status + ")."); }
+
+  if (!response.ok) throw new Error(data.error || "Pedido não concluído.");
   return data;
 }
 
 function showStatus(id, message) {
-  document.getElementById(id).textContent = message;
+  const target = document.getElementById(id);
+  if (target) target.textContent = message;
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>'"]/g, function (char) {
+    return {
+      "&": "&amp;", "<": "&lt;", ">": "&gt;",
+      "'": "&#039;", '"': "&quot;"
+    }[char];
+  });
 }
 
 function renderUser(data) {
   if (!data.user) {
-    guestView.classList.remove('hidden');
-    userView.classList.add('hidden');
+    guestView.classList.remove("hidden");
+    userView.classList.add("hidden");
     return;
   }
 
-  guestView.classList.add('hidden');
-  userView.classList.remove('hidden');
-  document.getElementById('profile-name').textContent = data.user.name || 'Nexauren member';
-  document.getElementById('profile-email').textContent = data.user.email;
-  document.getElementById('profile-role').textContent = data.user.role;
-  document.getElementById('credit-balance').textContent = data.credits;
+  guestView.classList.add("hidden");
+  userView.classList.remove("hidden");
+  document.getElementById("profile-name").textContent = data.user.name || "Leitor Nexauren";
+  document.getElementById("profile-email").textContent = data.user.email || "";
+  document.getElementById("profile-role").textContent = data.user.role || "user";
 
-  const list = document.getElementById('purchases');
-  if (!data.purchases.length) {
-    list.innerHTML = '<div class="purchase"><span>No purchases yet.</span></div>';
+  const list = document.getElementById("purchases");
+  const purchases = (data.purchases || []).filter(function (item) {
+    return item.type === "book";
+  });
+
+  if (!purchases.length) {
+    list.innerHTML =
+      '<div class="purchase"><strong>Ainda não existem compras de livros.</strong>' +
+      '<span>Explore a loja para encontrar a sua próxima leitura.</span></div>';
     return;
   }
-  list.innerHTML = data.purchases.map((item) =>
-    `<div class="purchase"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)}</span></div>`
-  ).join('');
+
+  list.innerHTML = purchases.map(function (item) {
+    return '<div class="purchase"><strong>' + escapeHtml(item.title) +
+      '</strong><span>Livro · Compra registada na Nexauren Story</span></div>';
+  }).join("");
 }
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;',
-  }[char]));
-}
-
-loginForm.addEventListener('submit', async (event) => {
+loginForm.addEventListener("submit", async function (event) {
   event.preventDefault();
-  showStatus('login-status', 'Signing in…');
+  showStatus("login-status", "A entrar…");
   try {
-    await api('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await api("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
         email: loginForm.email.value,
-        password: loginForm.password.value,
-      }),
+        password: loginForm.password.value
+      })
     });
-    showStatus('login-status', 'Signed in.');
     await loadAccount();
   } catch (error) {
-    showStatus('login-status', error.message);
+    showStatus("login-status", error.message);
   }
 });
 
-registerForm.addEventListener('submit', async (event) => {
+registerForm.addEventListener("submit", async function (event) {
   event.preventDefault();
-  showStatus('register-status', 'Creating account…');
+  showStatus("register-status", "A criar a conta…");
+
   if (registerForm.password.value !== registerForm.confirm_password.value) {
-    showStatus('register-status', 'Passwords do not match.');
+    showStatus("register-status", "As palavras-passe não coincidem.");
     return;
   }
+
   try {
-    await api('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await api("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
         name: registerForm.name.value,
         email: registerForm.email.value,
-        password: registerForm.password.value,
-      }),
+        password: registerForm.password.value
+      })
     });
-    showStatus('register-status', 'Account created.');
     await loadAccount();
   } catch (error) {
-    showStatus('register-status', error.message);
+    showStatus("register-status", error.message);
   }
 });
 
-logoutButton.addEventListener('click', async () => {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  await loadAccount();
+logoutButton.addEventListener("click", async function () {
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+  } finally {
+    await loadAccount();
+  }
 });
 
 async function loadAccount() {
   try {
-    const data = await api('/api/account');
-    renderUser(data);
-  } catch {
+    renderUser(await api("/api/account"));
+  } catch (_) {
     renderUser({ user: null });
   }
 }
-
-document.querySelectorAll('.show-credits').forEach((button) => {
-  button.addEventListener('click', async () => {
-    try {
-      const data = await api('/api/account');
-      if (!data.user) return showStatus('login-status', 'Sign in first.');
-      window.location.href = '/account/?credits=1';
-    } catch (error) {
-      showStatus('login-status', error.message);
-    }
-  });
-});
 
 loadAccount();
