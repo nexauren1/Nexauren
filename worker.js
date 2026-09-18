@@ -844,7 +844,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Editorial Structure Planner. Build a complete, practical book structure from the Story Bible. Use European Portuguese wording when the book language is pt-PT. Return front_matter, chapters and back_matter. Consider a title page, copyright page, dedication, epigraph when appropriate, presentation, preface when appropriate, introduction when useful, and a contents/index entry. Do not force irrelevant elements: mark them included=false. The contents/index item must have empty content because the system builds it from the chapter list. Every chapter needs a stable number, a specific title, an objective, characters, location, conflict and result. Never contradict locked canon. Return only JSON matching the schema.',
+      'You are the NexaurenBooks Editorial Structure Planner. Build a complete practical book structure from the Story Bible using European Portuguese. Always return these opening elements as included=true for a normal book: title page, copyright page, dedication, presentation, preface and introduction. Also return an epigraph entry as included=true when the story benefits from one. Return a contents/index entry with included=true, but its content must be empty because the system creates it from the chapter list. Then return every planned chapter with a stable number, a specific title, an objective, characters, location, conflict and result. Finally return useful closing elements such as acknowledgements or an author note when appropriate. The structure must be coherent and ready for PDF and EPUB. Never contradict locked canon. Return only JSON matching the schema.',
       `Book:\n${clip(base, 14000)}\n\nStory Bible:\n${clip(context.story_bible, 30000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Create the editorial structure now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
@@ -992,8 +992,8 @@ async function adminAI(request, env, admin) {
     );
     await env.BOOKS_DB.prepare(
       `INSERT INTO originality_checks
-        (id, book_id, stage, result_json, created_at, created_by)
-       VALUES (?, ?, 'full', ?, ?, ?)`,
+        (id, book_id, status, result_json, created_at, created_by)
+       VALUES (?, ?, 'completed', ?, ?, ?)`,
     ).bind(
       randomId('originality'),
       bookId,
@@ -1032,17 +1032,17 @@ async function adminAI(request, env, admin) {
     ).run();
     await env.BOOKS_DB.prepare(
       `INSERT INTO seo_metadata
-        (book_id, slug, meta_title, meta_description, keywords_json,
-         og_title, og_description, social_text, updated_at)
+        (book_id, slug, seo_title, seo_description, keywords_json,
+         og_title, og_description, structured_data_json, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(book_id) DO UPDATE SET
          slug = excluded.slug,
-         meta_title = excluded.meta_title,
-         meta_description = excluded.meta_description,
+         seo_title = excluded.seo_title,
+         seo_description = excluded.seo_description,
          keywords_json = excluded.keywords_json,
          og_title = excluded.og_title,
          og_description = excluded.og_description,
-         social_text = excluded.social_text,
+         structured_data_json = excluded.structured_data_json,
          updated_at = excluded.updated_at`,
     ).bind(
       bookId,
@@ -1052,7 +1052,12 @@ async function adminAI(request, env, admin) {
       JSON.stringify(seo.keywords || []),
       seo.og_title,
       seo.og_description,
-      seo.social_text,
+      JSON.stringify({
+        short_description: seo.short_description || '',
+        social_text: seo.social_text || '',
+        categories: seo.categories || [],
+        tags: seo.tags || [],
+      }),
       now(),
     ).run();
     return json({ ok: true, action, seo });
@@ -1303,8 +1308,8 @@ async function adminApi(request, env) {
          FROM canonical_facts WHERE book_id = ? ORDER BY fact_key`,
     ).bind(bookId).all();
     const changes = await env.BOOKS_DB.prepare(
-      `SELECT id, fact_key, old_value, new_value, reason,
-              changed_by, created_at
+      `SELECT id, fact_id, old_value, new_value, reason,
+              created_by, created_at
          FROM canon_changes WHERE book_id = ?
         ORDER BY created_at DESC LIMIT 100`,
     ).bind(bookId).all();
@@ -1345,13 +1350,13 @@ async function adminApi(request, env) {
       if (existing.fact_value !== factValue) {
         await env.BOOKS_DB.prepare(
           `INSERT INTO canon_changes
-            (id, book_id, fact_key, old_value, new_value,
-             reason, changed_by, created_at)
+            (id, book_id, fact_id, old_value, new_value,
+             reason, created_by, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ).bind(
           randomId('canonchange'),
           bookId,
-          factKey,
+          existing.id,
           existing.fact_value,
           factValue,
           reason,
@@ -1440,9 +1445,9 @@ async function adminApi(request, env) {
     const id = randomId('cover');
     await env.BOOKS_DB.prepare(
       `INSERT INTO covers
-        (id, book_id, prompt, model, data_uri, status, selected,
+        (id, book_id, prompt, model, data_uri, is_selected,
          created_at, created_by)
-       VALUES (?, ?, ?, ?, ?, 'generated', 0, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
     ).bind(id, bookId, prompt, IMAGE_MODEL, dataUri, now(), admin.user_id).run();
     return json({ ok: true, id, data_uri: dataUri });
   }
@@ -1455,10 +1460,10 @@ async function adminApi(request, env) {
     ).bind(coverId).first();
     if (!cover) return json({ error: 'Cover not found.' }, 404);
     await env.BOOKS_DB.prepare(
-      'UPDATE covers SET selected = 0 WHERE book_id = ?',
+      'UPDATE covers SET is_selected = 0 WHERE book_id = ?',
     ).bind(cover.book_id).run();
     await env.BOOKS_DB.prepare(
-      'UPDATE covers SET selected = 1 WHERE id = ?',
+      'UPDATE covers SET is_selected = 1 WHERE id = ?',
     ).bind(coverId).run();
     await env.BOOKS_DB.prepare(
       'UPDATE books SET cover_url = ?, updated_at = ? WHERE id = ?',
@@ -1474,7 +1479,7 @@ async function adminApi(request, env) {
     const bookId = url.searchParams.get('book_id');
     if (!bookId) return json({ error: 'book_id is required.' }, 400);
     const result = await env.BOOKS_DB.prepare(
-      `SELECT id, book_id, prompt, model, status, selected, created_at
+      `SELECT id, book_id, prompt, model, provider, is_selected AS selected, created_at
          FROM covers WHERE book_id = ?
         ORDER BY created_at DESC LIMIT 30`,
     ).bind(bookId).all();
@@ -2000,7 +2005,7 @@ async function publicBooksApi(request, env) {
     if (!book) return new Response('Not found', { status: 404 });
     const cover = await env.BOOKS_DB.prepare(
       `SELECT data_uri FROM covers
-        WHERE book_id = ? AND selected = 1 LIMIT 1`,
+        WHERE book_id = ? AND is_selected = 1 LIMIT 1`,
     ).bind(book.id).first();
     if (!cover?.data_uri) return new Response('Not found', { status: 404 });
     const match = String(cover.data_uri).match(/^data:([^;]+);base64,(.+)$/s);
@@ -2026,7 +2031,7 @@ async function publicBooksApi(request, env) {
     ).bind(book.id).first();
     const cover = await env.BOOKS_DB.prepare(
       `SELECT id FROM covers WHERE book_id = ?
-         AND selected = 1 LIMIT 1`,
+         AND is_selected = 1 LIMIT 1`,
     ).bind(book.id).first();
     return json({
       book: {
@@ -2071,7 +2076,7 @@ async function publicBooksApi(request, env) {
         );
     await env.BOOKS_DB.prepare(
       `INSERT INTO download_logs
-        (id, book_id, user_id, format, created_at)
+        (id, book_id, file_type, user_id, created_at)
        VALUES (?, ?, ?, ?, ?)`,
     ).bind(
       randomId('download'),

@@ -6,34 +6,30 @@ async function readJson(response) {
   try {
     return text ? JSON.parse(text) : {};
   } catch {
-    throw new Error('The Admin service returned an invalid response.');
+    throw new Error('O servidor devolveu uma resposta inválida.');
   }
 }
 
-async function checkAdminSession() {
+async function checkSession() {
   try {
     const response = await fetch('/api/auth/me', {
-      method: 'GET',
       credentials: 'same-origin',
       cache: 'no-store',
     });
     const data = await readJson(response);
     if (response.ok && data.user?.role === 'admin') {
       window.location.replace('/admin/');
-      return true;
     }
   } catch {
-    // The login form remains available when the session check cannot run.
+    // O formulário continua disponível.
   }
-  return false;
 }
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  statusBox.textContent = 'Checking access…';
-
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
+  statusBox.textContent = 'A confirmar acesso…';
 
   try {
     const response = await fetch('/api/auth/login', {
@@ -49,34 +45,28 @@ form.addEventListener('submit', async (event) => {
     const data = await readJson(response);
 
     if (!response.ok) {
-      throw new Error(data.error || 'Could not sign in.');
+      throw new Error(data.error || 'Não foi possível iniciar sessão.');
     }
-
     if (data.user?.role !== 'admin') {
       await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
       });
-      throw new Error('This account does not have admin access.');
+      throw new Error('Esta conta não tem acesso de administrador.');
     }
 
-    statusBox.textContent = 'Access confirmed. Opening Admin Studio…';
-
-    // Confirm the new HttpOnly session before navigating to the protected page.
-    const sessionResponse = await fetch('/api/auth/me', {
-      method: 'GET',
+    const confirmResponse = await fetch('/api/auth/me', {
       credentials: 'same-origin',
       cache: 'no-store',
     });
-    const sessionData = await readJson(sessionResponse);
+    const confirmData = await readJson(confirmResponse);
 
-    if (!sessionResponse.ok || sessionData.user?.role !== 'admin') {
-      throw new Error(
-        'The admin session was not saved. Please refresh and sign in again.',
-      );
+    if (!confirmResponse.ok || confirmData.user?.role !== 'admin') {
+      throw new Error('A sessão de administrador não foi confirmada. Tenta novamente.');
     }
 
+    statusBox.textContent = 'Acesso confirmado. A abrir o Admin…';
     window.location.replace('/admin/');
   } catch (error) {
     statusBox.textContent = error.message;
@@ -85,4 +75,4 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
-checkAdminSession();
+checkSession();

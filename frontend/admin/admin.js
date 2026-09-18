@@ -1,15 +1,14 @@
-const tabs = [...document.querySelectorAll('.tab')];
-const views = [...document.querySelectorAll('.view')];
-
 const state = {
   user: null,
   books: [],
   currentBook: null,
-  series: [],
   selectedChapter: null,
+  busy: false,
 };
 
 const $ = (id) => document.getElementById(id);
+const navItems = [...document.querySelectorAll('.nav-item')];
+const views = [...document.querySelectorAll('.view')];
 
 const STATUS_LABELS = {
   draft: 'Rascunho',
@@ -22,82 +21,8 @@ const STATUS_LABELS = {
   archived: 'Arquivado',
 };
 
-const KEY_LABELS = {
-  concept: 'Conceito',
-  relevant_references: 'Referências relevantes',
-  historical_context: 'Contexto histórico',
-  geographic_context: 'Contexto geográfico',
-  cultural_elements: 'Elementos culturais',
-  possible_problems: 'Pontos a verificar',
-  similar_ideas: 'Ideias semelhantes',
-  important_terms: 'Termos importantes',
-  unresolved_questions: 'Perguntas em aberto',
-  verification_notes: 'Notas de verificação',
-  identity: 'Identidade',
-  story: 'História',
-  characters: 'Personagens',
-  relations: 'Relações',
-  world: 'Mundo',
-  timeline: 'Linha do tempo',
-  style: 'Estilo',
-  continuity: 'Continuidade',
-  continuation: 'Continuação',
-};
-
-const NEXT_STEPS = {
-  start: {
-    label: 'Criar o primeiro livro',
-    copy: 'Só precisas do título e da ideia. O resto pode ficar para depois.',
-    button: 'Criar livro →',
-    go: 'project',
-  },
-  research: {
-    label: 'Pesquisar a ideia',
-    copy: 'A IA prepara contexto, referências, dúvidas e pontos a verificar.',
-    button: 'Pesquisar →',
-    go: 'project',
-    action: 'research',
-  },
-  story_bible: {
-    label: 'Construir a história',
-    copy: 'Transforma a ideia num mundo, personagens, relações e regras coerentes.',
-    button: 'Criar Story Bible →',
-    go: 'project',
-    action: 'story_bible',
-  },
-  structure: {
-    label: 'Preparar a estrutura do livro',
-    copy: 'Define folha de rosto, dedicatória, apresentação, prefácio, introdução, índice e capítulos.',
-    button: 'Gerar estrutura →',
-    go: 'writing',
-    action: 'structure',
-  },
-  chapter: {
-    label: 'Escrever o próximo capítulo',
-    copy: 'Escolhe o capítulo planeado e gera a prosa com o título definido no plano.',
-    button: 'Escrever capítulo →',
-    go: 'writing',
-    action: 'chapter',
-  },
-  quality: {
-    label: 'Fazer a revisão',
-    copy: 'Confirma continuidade, qualidade geral e problemas antes da publicação.',
-    button: 'Abrir revisão →',
-    go: 'quality',
-  },
-  production: {
-    label: 'Preparar a publicação',
-    copy: 'Trata da capa, ficheiros, SEO, preço e estado do livro.',
-    button: 'Abrir publicação →',
-    go: 'production',
-  },
-};
-
-function money(value, currency = 'USD') {
-  return Number(value || 0).toLocaleString('pt-PT', {
-    style: 'currency',
-    currency,
-  });
+function statusLabel(value) {
+  return STATUS_LABELS[value] || String(value || '—');
 }
 
 function escapeHtml(value) {
@@ -110,40 +35,26 @@ function escapeHtml(value) {
   }[char]));
 }
 
-function labelFor(key) {
-  return KEY_LABELS[key] || String(key || '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+function safeText(value) {
+  return String(value ?? '').trim();
 }
 
-function statusLabel(value) {
-  return STATUS_LABELS[value] || String(value || '—');
+function countText(value) {
+  const n = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return n.toLocaleString('pt-PT');
 }
 
-function languageLabel(value) {
-  return ({
-    'pt-PT': 'Português (Portugal)',
-    pt: 'Português',
-    en: 'Inglês',
-    fr: 'Francês',
-    es: 'Espanhol',
-  })[value] || String(value || '—');
-}
-
-function statusClass(value) {
-  return `status-${String(value || 'draft').toLowerCase()}`;
-}
-
-function setStatus(message, kind = '') {
+function setGlobal(message, kind = '') {
   const node = $('global-status');
   if (!node) return;
   node.textContent = message || '';
-  node.className = `global-status ${kind}`.trim();
+  node.className = 'global-status' + (kind ? ' ' + kind : '');
+  clearTimeout(setGlobal.timer);
   if (message) {
-    clearTimeout(setStatus.timer);
-    setStatus.timer = setTimeout(() => {
-      if (node.textContent === message) node.textContent = '';
-    }, 4200);
+    setGlobal.timer = setTimeout(() => {
+      node.textContent = '';
+      node.className = 'global-status';
+    }, 5000);
   }
 }
 
@@ -151,7 +62,7 @@ function setInline(id, message, kind = '') {
   const node = $(id);
   if (!node) return;
   node.textContent = message || '';
-  node.className = `inline-status ${kind}`.trim();
+  node.className = 'inline-status' + (kind ? ' ' + kind : '');
 }
 
 async function api(path, options = {}) {
@@ -166,63 +77,94 @@ async function api(path, options = {}) {
     },
   });
 
-  const text = await response.text();
+  const body = await response.text();
   let data = {};
   try {
-    data = text ? JSON.parse(text) : {};
+    data = body ? JSON.parse(body) : {};
   } catch {
-    throw new Error(`O servidor devolveu uma resposta inválida (${response.status}).`);
+    throw new Error('O servidor devolveu uma resposta inválida.');
   }
+
   if (!response.ok) {
-    throw new Error(data.error || `O pedido falhou (${response.status}).`);
+    throw new Error(data.error || 'O pedido falhou.');
   }
   return data;
 }
 
-async function readAdminSession() {
-  try {
-    const data = await api('/api/auth/me');
-    if (data.user?.role === 'admin') return data.user;
-  } catch {
-    // Retry in ensureAdmin.
+async function ensureAdmin() {
+  const data = await api('/api/auth/me');
+  if (data.user?.role !== 'admin') {
+    window.location.replace('/admin/login/');
+    return null;
   }
-  return null;
+  state.user = data.user;
+  $('admin-user').textContent = data.user.email || 'Administrador';
+  return data.user;
 }
 
-async function ensureAdmin() {
-  let user = await readAdminSession();
-  if (!user) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    user = await readAdminSession();
-  }
-  if (!user) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    user = await readAdminSession();
-  }
-  if (!user) throw new Error('Não foi possível confirmar a sessão de administrador.');
-  state.user = user;
-  $('admin-user').textContent = user.email;
-  return user;
+function setNav(section) {
+  navItems.forEach((item) => {
+    item.classList.toggle('active', item.dataset.section === section);
+  });
+  views.forEach((view) => {
+    view.classList.toggle('hidden', view.id !== 'section-' + section);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function goTo(section) {
-  const tab = document.querySelector(`.tab[data-section="${section}"]`);
-  if (tab) tab.click();
+  const item = navItems.find((nav) => nav.dataset.section === section);
+  if (item) item.click();
 }
 
-function formObject(form) {
-  return Object.fromEntries(new FormData(form).entries());
+function bookStructure(book = state.currentBook) {
+  const raw = book?.story_bible?.outline;
+  if (Array.isArray(raw)) {
+    return {
+      front_matter: [],
+      chapters: raw.filter((item) => item && Number(item.number) > 0)
+        .sort((a, b) => Number(a.number) - Number(b.number)),
+      back_matter: [],
+    };
+  }
+  if (raw && typeof raw === 'object') {
+    return {
+      front_matter: Array.isArray(raw.front_matter) ? raw.front_matter : [],
+      chapters: Array.isArray(raw.chapters) ? raw.chapters : [],
+      back_matter: Array.isArray(raw.back_matter) ? raw.back_matter : [],
+    };
+  }
+  return { front_matter: [], chapters: [], back_matter: [] };
 }
 
-function setButtonBusy(button, busy, busyLabel) {
-  if (!button) return () => {};
-  const original = button.textContent;
-  button.disabled = busy;
-  if (busy) button.textContent = busyLabel;
-  return () => {
-    button.disabled = false;
-    button.textContent = original;
-  };
+function currentChapters(book = state.currentBook) {
+  return (book?.chapters || [])
+    .filter((item) => Number(item.is_current) === 1)
+    .sort((a, b) => Number(a.chapter_number) - Number(b.chapter_number));
+}
+
+function hasResearch(book = state.currentBook) {
+  const row = book?.research_notes?.[0];
+  return Boolean(row);
+}
+
+function hasBible(book = state.currentBook) {
+  return Boolean(book?.story_bible && Object.keys(book.story_bible).length);
+}
+
+function hasStructure(book = state.currentBook) {
+  return bookStructure(book).chapters.length > 0;
+}
+
+function progress(book = state.currentBook) {
+  if (!book) return 0;
+  if (book.status === 'published') return 4;
+  if (book.status === 'review') return 3;
+  if (currentChapters(book).length) return 2;
+  if (hasStructure(book)) return 2;
+  if (hasBible(book)) return 1;
+  if (hasResearch(book)) return 1;
+  return 0;
 }
 
 function renderBookOptions() {
@@ -230,882 +172,695 @@ function renderBookOptions() {
   for (const book of state.books) {
     const selected = state.currentBook?.id === book.id ? ' selected' : '';
     options.push(
-      `<option value="${escapeHtml(book.id)}"${selected}>${escapeHtml(book.title)} · ${escapeHtml(statusLabel(book.status))}</option>`,
+      '<option value="' + escapeHtml(book.id) + '"' + selected + '>'
+      + escapeHtml(book.title || 'Sem título')
+      + ' · ' + escapeHtml(statusLabel(book.status))
+      + '</option>',
     );
   }
-  for (const id of ['book-context', 'mobile-book-context']) {
+
+  ['book-context', 'mobile-book-context'].forEach((id) => {
     const select = $(id);
-    if (!select) continue;
+    if (!select) return;
     select.innerHTML = options.join('');
     if (state.currentBook) select.value = state.currentBook.id;
-  }
-}
-
-function clearNewBookForm() {
-  state.currentBook = null;
-  state.selectedChapter = null;
-  $('book-form')?.reset();
-  const form = $('book-form');
-  if (!form) return;
-  form.elements.language.value = 'pt-PT';
-  form.elements.author.value = 'Nexauren';
-  form.elements.approx_chapter_count.value = '12';
-  updateBookFormMode();
-  renderBookOptions();
-  renderDashboard();
-  renderProject();
-  renderWriting();
-}
-
-function updateBookFormMode() {
-  const book = state.currentBook;
-  if ($('project-page-title')) $('project-page-title').textContent = book ? 'Continuar projecto' : 'Criar o projecto';
-  if ($('book-form-title')) $('book-form-title').textContent = book ? 'Editar livro' : 'Novo livro';
-  if ($('book-save')) $('book-save').textContent = book ? 'Guardar alterações' : 'Guardar projecto';
-  if ($('create-and-research')) $('create-and-research').textContent = book ? 'Guardar e pesquisar' : 'Guardar e pesquisar';
-  if ($('project-stage')) {
-    $('project-stage').textContent = book ? statusLabel(book.status) : 'Novo projecto';
-    $('project-stage').className = `status-badge ${statusClass(book?.status)}`;
-  }
-  if (!$('book-form') || !book) return;
-  const form = $('book-form');
-  const fields = [
-    'title', 'subtitle', 'author', 'language', 'genre', 'subgenre',
-    'audience', 'age_rating', 'desired_size', 'approx_chapter_count',
-    'style', 'pov', 'tone', 'pacing', 'premise',
-  ];
-  fields.forEach((field) => {
-    const input = form.elements[field];
-    if (!input) return;
-    input.value = book[field] ?? (field === 'approx_chapter_count' ? 12 : '');
   });
 }
 
 async function loadBooks() {
   const data = await api('/api/admin/books');
-  state.books = data.items || [];
+  state.books = Array.isArray(data.items) ? data.items : [];
   renderBookOptions();
-  if (!state.currentBook && state.books.length) {
-    const stored = localStorage.getItem('nexauren_books_admin_book');
-    const preferred = state.books.find((book) => book.id === stored);
-    await selectBook(preferred?.id || state.books[0].id, false);
-  } else if (state.currentBook) {
-    const fresh = state.books.find((book) => book.id === state.currentBook.id);
-    if (fresh) await selectBook(fresh.id, false);
+
+  if (state.currentBook) {
+    const same = state.books.find((book) => book.id === state.currentBook.id);
+    if (same) return selectBook(same.id, false);
   }
-  renderBooksList();
-  updateBookFormMode();
+
+  const saved = localStorage.getItem('nexauren_books_admin_book');
+  const preferred = state.books.find((book) => book.id === saved);
+  if (preferred) return selectBook(preferred.id, false);
+
+  if (state.books[0]) return selectBook(state.books[0].id, false);
+  renderAll();
 }
 
-async function selectBook(bookId, notify = true) {
+async function selectBook(bookId, notify = false) {
   if (!bookId) {
-    clearNewBookForm();
+    state.currentBook = null;
+    state.selectedChapter = null;
+    renderAll();
     return;
   }
-  const data = await api(`/api/admin/books/${encodeURIComponent(bookId)}`);
-  state.currentBook = data.book;
-  state.selectedChapter = null;
+
+  const data = await api('/api/admin/books/' + encodeURIComponent(bookId));
+  state.currentBook = data.book || null;
+  state.selectedChapter = currentChapters(state.currentBook)[0] || null;
   localStorage.setItem('nexauren_books_admin_book', bookId);
-  renderBookOptions();
-  updateBookFormMode();
-  renderDashboard();
-  renderProject();
-  renderWriting();
-  renderProduction().catch(() => {});
-  renderQualityPlaceholders();
-  if (notify) setStatus(`Livro activo: ${state.currentBook.title}`, 'success');
-}
-
-function renderBooksList() {
-  const target = $('books-list');
-  if (!target) return;
-  if (!state.books.length) {
-    target.innerHTML = '<div class="empty">Ainda não existem livros. Cria o primeiro projecto para começar.</div>';
-    return;
-  }
-  target.innerHTML = state.books.map((book) => `
-    <article class="book-row">
-      <div>
-        <strong>${escapeHtml(book.title)}</strong>
-        <p>${escapeHtml(book.author || 'Nexauren')} · ${escapeHtml(book.genre || 'Sem género')} · ${escapeHtml(statusLabel(book.status))} · ${money(book.price_usd)}</p>
-      </div>
-      <div class="book-actions">
-        <span class="status-badge ${statusClass(book.status)}">${escapeHtml(statusLabel(book.status))}</span>
-        <button class="secondary-button" type="button" data-open-book="${escapeHtml(book.id)}">Abrir</button>
-      </div>
-    </article>
-  `).join('');
-  target.querySelectorAll('[data-open-book]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      try {
-        await selectBook(button.dataset.openBook);
-        goTo('dashboard');
-      } catch (error) {
-        setStatus(error.message, 'error');
-      }
-    });
-  });
-}
-
-async function loadOverview() {
-  const data = await api('/api/admin/overview');
-  $('m-books').textContent = data.books.total;
-  $('m-published').textContent = data.books.published;
-  $('m-drafts').textContent = data.books.drafts;
-  $('m-review').textContent = data.books.review;
-  $('m-users').textContent = data.platform.users;
-  $('m-revenue').textContent = money(data.platform.revenue);
-  const ai = data.ai || {};
-  $('ai-text-model').textContent = ai.text_model || '—';
-  $('ai-image-model').textContent = ai.image_model || '—';
-  $('ai-summary').textContent = ai.configured
-    ? `IA pronta. ${Number(ai.jobs_last_24h || 0)} execução(ões) nas últimas 24 horas.`
-    : 'A IA ainda não está configurada neste Worker.';
-  $('ai-dot').className = `live-dot ${ai.configured ? 'ready' : 'offline'}`;
-  $('ai-state').className = `ai-state ${ai.configured ? 'ready' : 'offline'}`;
-  $('ai-state').querySelector('span').textContent = ai.configured ? 'IA pronta' : 'IA indisponível';
-}
-
-function renderObject(value, depth = 0) {
-  if (value === null || value === undefined || value === '') return '<span class="muted-small">—</span>';
-  if (typeof value !== 'object') return `<p>${escapeHtml(value)}</p>`;
-  if (Array.isArray(value)) {
-    if (!value.length) return '<p class="muted-small">Sem itens.</p>';
-    return `<ul>${value.map((item) => `<li>${typeof item === 'object' ? renderObject(item, depth + 1) : escapeHtml(item)}</li>`).join('')}</ul>`;
-  }
-  return `<div class="ai-object ${depth > 0 ? 'nested' : ''}">${Object.entries(value).map(([key, item]) => `
-    <div class="ai-block">
-      <h3>${escapeHtml(labelFor(key))}</h3>
-      ${renderObject(item, depth + 1)}
-    </div>
-  `).join('')}</div>`;
-}
-
-function renderCompactAI(targetId, payload, title = '') {
-  const target = $(targetId);
-  if (!target) return;
-  const value = payload && typeof payload === 'object' ? payload : { resultado: payload };
-  const arrays = Object.entries(value).filter(([, item]) => Array.isArray(item));
-  const strings = Object.entries(value).filter(([, item]) => typeof item === 'string' && item.trim());
-  const scalar = Object.entries(value).filter(([, item]) => typeof item !== 'object' && typeof item !== 'string');
-
-  const boxes = [];
-  if (arrays.length) {
-    arrays.slice(0, 4).forEach(([key, items]) => {
-      boxes.push(`<div class="ai-summary-box"><span>${escapeHtml(labelFor(key))}</span><strong>${items.length}</strong></div>`);
-    });
-  }
-  scalar.slice(0, 2).forEach(([key, item]) => {
-    boxes.push(`<div class="ai-summary-box"><span>${escapeHtml(labelFor(key))}</span><strong>${escapeHtml(item)}</strong></div>`);
-  });
-
-  const previews = [];
-  strings.slice(0, 3).forEach(([key, item]) => {
-    previews.push(`<div class="ai-preview-item"><strong>${escapeHtml(labelFor(key))}</strong><p>${escapeHtml(item)}</p></div>`);
-  });
-
-  target.innerHTML = `
-    ${title ? `<div class="section-label">${escapeHtml(title)}</div>` : ''}
-    ${boxes.length ? `<div class="ai-summary-grid">${boxes.join('')}</div>` : ''}
-    ${previews.length ? `<div class="ai-preview">${previews.join('')}</div>` : ''}
-    <details class="json-details"><summary>Ver detalhes técnicos</summary><pre class="ai-json">${escapeHtml(JSON.stringify(payload, null, 2))}</pre></details>
-  `;
-}
-
-function getResearch(book) {
-  const row = book?.research_notes?.[0];
-  if (!row) return null;
-  try { return JSON.parse(row.note); } catch { return { note: row.note }; }
-}
-
-function getStructure(book) {
-  const outline = book?.story_bible?.outline;
-  if (Array.isArray(outline)) {
-    const special = outline.find((item) => item?.type === 'book_structure');
-    const chapters = outline
-      .filter((item) => item && item.type !== 'book_structure' && Number(item.number) > 0)
-      .sort((a, b) => Number(a.number) - Number(b.number));
-    return {
-      front_matter: special?.front_matter || [],
-      chapters,
-      back_matter: special?.back_matter || [],
-      generated: Boolean(special),
-    };
-  }
-  if (outline && typeof outline === 'object') {
-    return {
-      front_matter: outline.front_matter || [],
-      chapters: outline.chapters || [],
-      back_matter: outline.back_matter || [],
-      generated: true,
-    };
-  }
-  return { front_matter: [], chapters: [], back_matter: [], generated: false };
-}
-
-function currentChapters(book) {
-  return (book?.chapters || [])
-    .filter((item) => Number(item.is_current) === 1)
-    .sort((a, b) => Number(a.chapter_number) - Number(b.chapter_number));
-}
-
-function projectProgress(book) {
-  if (!book) return { key: 'start', done: 0 };
-  const research = Boolean(getResearch(book));
-  const bible = Boolean(book.story_bible && Object.keys(book.story_bible).length);
-  const structure = getStructure(book).generated;
-  const chapters = currentChapters(book).length > 0;
-  const quality = book.status === 'review' || book.status === 'approved' || book.status === 'published';
-  const published = book.status === 'published';
-  if (published) return { key: 'production', done: 6 };
-  if (quality) return { key: 'production', done: 5 };
-  if (chapters) return { key: 'quality', done: 4 };
-  if (structure) return { key: 'chapter', done: 3 };
-  if (bible) return { key: 'structure', done: 2 };
-  if (research) return { key: 'story_bible', done: 1 };
-  return { key: 'research', done: 0 };
+  renderAll();
+  if (notify) setGlobal('Livro actual: ' + (state.currentBook?.title || '—'), 'success');
 }
 
 function renderDashboard() {
   const book = state.currentBook;
-  $('dashboard-book-title').textContent = book?.title || 'Ainda não seleccionaste um livro';
+  $('dashboard-book-title').textContent = book?.title || 'Ainda não tens um livro seleccionado';
   $('dashboard-book-description').textContent = book
-    ? `${book.author || 'Nexauren'} · ${book.genre || 'Sem género'} · ${statusLabel(book.status)}`
-    : 'Cria um projecto para começar.';
+    ? (book.premise || book.description || 'Este livro está pronto para continuar.')
+    : 'Cria o teu primeiro livro para começar.';
   $('book-stage').textContent = book ? statusLabel(book.status) : 'Sem livro';
-  $('book-stage').className = `status-badge ${statusClass(book?.status)}`;
+
   const tags = [];
-  if (book?.language) tags.push(languageLabel(book.language));
+  if (book?.language) tags.push('Português (Portugal)');
+  if (book?.genre) tags.push(book.genre);
   if (book?.age_rating) tags.push(book.age_rating);
-  if (book?.audience) tags.push(book.audience);
-  if (book?.subgenre) tags.push(book.subgenre);
-  $('dashboard-book-tags').innerHTML = tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+  $('dashboard-book-tags').innerHTML = tags
+    .map((tag) => '<span class="tag">' + escapeHtml(tag) + '</span>')
+    .join('');
 
-  const progress = projectProgress(book);
-  const step = NEXT_STEPS[progress.key] || NEXT_STEPS.start;
-  $('dashboard-next-title').textContent = step.label;
-  $('dashboard-next-copy').textContent = step.copy;
-  const nextButton = $('dashboard-next');
-  nextButton.textContent = step.button;
-  nextButton.dataset.go = step.go || 'project';
-  nextButton.dataset.action = step.action || '';
-  nextButton.dataset.newBook = progress.key === 'start' ? 'true' : 'false';
+  const p = progress(book);
+  $('progress-label').textContent = p + ' de 4 passos';
+  $('progress-fill').style.width = Math.round((p / 4) * 100) + '%';
 
-  const progressLabel = $('progress-label');
-  progressLabel.textContent = `${progress.done} de 6 passos concluídos`;
-  $('progress-fill').style.width = `${Math.round((progress.done / 6) * 100)}%`;
+  const next = p === 0
+    ? ['Criar o primeiro livro', 'Só precisas do título e da ideia.', 'Criar livro', 'prepare']
+    : p === 1
+      ? ['Preparar a estrutura', 'A IA vai terminar a pesquisa, Story Bible e índice.', 'Preparar com IA', 'prepare']
+      : p === 2
+        ? ['Continuar a escrita', 'Escolhe o próximo capítulo e deixa a IA escrever.', 'Escrever', 'writing']
+        : p === 3
+          ? ['Preparar publicação', 'Confirma a revisão e trata da capa e dos ficheiros.', 'Publicar', 'publish']
+          : ['Livro publicado', 'O projecto já passou pelo percurso principal.', 'Abrir publicação', 'publish'];
 
-  const structure = getStructure(book);
-  const chapters = currentChapters(book);
-  const steps = [...document.querySelectorAll('#workflow-steps button')];
-  steps.forEach((button, index) => button.classList.toggle('done', index < progress.done));
-  if (steps[5]) steps[5].classList.toggle('done', book?.status === 'published');
+  $('next-title').textContent = next[0];
+  $('next-copy').textContent = next[1];
+  $('next-button').textContent = next[2];
+  $('next-button').dataset.nextSection = next[3];
+  $('next-button').dataset.nextAction = p === 0 ? 'new' : p === 1 ? 'prepare' : '';
+
+  const flow = [...document.querySelectorAll('#dashboard-flow button')];
+  flow.forEach((button, index) => button.classList.toggle('done', index < p));
 }
 
-function renderProject() {
+function renderPrepare() {
   const book = state.currentBook;
-  updateBookFormMode();
-  const research = getResearch(book);
-  const bible = book?.story_bible || null;
-  if (research) renderCompactAI('research-view', research, 'Pesquisa');
-  else $('research-view').innerHTML = '<div class="empty-state">Ainda não há pesquisa. Podes fazê-la quando o projecto estiver guardado.</div>';
-  if (bible) renderStoryBibleSummary(bible);
-  else $('bible-state').innerHTML = '<div class="empty-state">Ainda não existe uma Story Bible.</div>';
+  $('prepare-empty').classList.toggle('hidden', Boolean(book));
+  $('prepare-book').classList.toggle('hidden', !book);
 
-  const canon = book?.canonical_facts || [];
-  $('canon-list').innerHTML = canon.length ? canon.map((item) => `
-    <div class="canon-row">
-      <div><strong>${escapeHtml(item.fact_key)}</strong><span>${escapeHtml(item.fact_value)} · v${escapeHtml(item.version)}</span></div>
-      <span class="${Number(item.immutable) ? 'locked' : ''}">${Number(item.immutable) ? 'Bloqueado' : 'Rascunho'}</span>
-    </div>
-  `).join('') : '<div class="empty">Ainda não existem factos canónicos.</div>';
+  if (!book) return;
 
-  const characters = bible?.characters || [];
-  $('characters-list').innerHTML = characters.length ? characters.slice(0, 12).map((item) => `
-    <article class="entity-card"><strong>${escapeHtml(item.name || item.id || 'Sem nome')}</strong>${item.age !== undefined ? `<span>Idade: ${escapeHtml(item.age)}</span>` : ''}${item.role ? `<span>Função: ${escapeHtml(item.role)}</span>` : ''}</article>
-  `).join('') : '<div class="empty">A Story Bible ainda não tem personagens estruturados.</div>';
+  $('prepare-book-title').textContent = book.title || 'Sem título';
+  $('prepare-book-idea').textContent = book.premise || book.description || 'Sem ideia registada.';
 
-  $('world-view').innerHTML = bible?.world ? renderObject(bible.world) : '<div class="empty">Ainda não existe um mundo estruturado.</div>';
-  const timeline = bible?.timeline || [];
-  $('timeline-view').innerHTML = timeline.length ? timeline.slice(0, 15).map((item) => `
-    <article class="timeline-item"><time>${escapeHtml(item.date || item.when || item.period || 'EVENTO')}</time><div><strong>${escapeHtml(item.title || item.name || 'Evento')}</strong><p>${escapeHtml(item.description || item.summary || '')}</p></div></article>
-  `).join('') : '<div class="empty">Ainda não existem eventos.</div>';
-}
+  const structure = bookStructure(book);
+  const stages = {
+    research: hasResearch(book),
+    bible: hasBible(book),
+    structure: structure.chapters.length > 0,
+  };
 
-function renderStoryBibleSummary(bible) {
-  const characters = Array.isArray(bible.characters) ? bible.characters.length : 0;
-  const relations = Array.isArray(bible.relations) ? bible.relations.length : 0;
-  const timeline = Array.isArray(bible.timeline) ? bible.timeline.length : 0;
-  const world = bible.world && typeof bible.world === 'object'
-    ? Object.keys(bible.world).length
-    : 0;
-  $('bible-state').innerHTML = `
-    <div class="ai-summary-grid">
-      <div class="ai-summary-box"><span>Personagens</span><strong>${characters}</strong></div>
-      <div class="ai-summary-box"><span>Relações</span><strong>${relations}</strong></div>
-      <div class="ai-summary-box"><span>Eventos</span><strong>${timeline}</strong></div>
-      <div class="ai-summary-box"><span>Áreas do mundo</span><strong>${world}</strong></div>
-    </div>
-    <div class="ai-preview">
-      <div class="ai-preview-item"><strong>${escapeHtml(bible.story?.premise || bible.story?.summary || 'História estruturada')}</strong><p>Story Bible guardada e pronta para a fase de estrutura.</p></div>
-    </div>
-    <details class="json-details"><summary>Ver dados técnicos da Story Bible</summary><pre class="ai-json">${escapeHtml(JSON.stringify(bible, null, 2))}</pre></details>
-  `;
-}
-
-function structurePart(label, items, emptyText) {
-  return `
-    <section class="structure-section">
-      <div class="structure-section-head"><span class="section-label">${escapeHtml(label)}</span><span>${items.length} elemento(s)</span></div>
-      ${items.length ? items.map((item, index) => `
-        <article class="structure-item">
-          <span class="structure-no">${item.number ? escapeHtml(item.number) : String(index + 1).padStart(2, '0')}</span>
-          <div><strong>${escapeHtml(item.title || item.name || 'Sem título')}</strong><p>${escapeHtml(item.purpose || item.objective || item.description || item.content || '')}</p></div>
-          <span class="structure-mark">${item.included === false ? 'Opcional' : 'Incluído'}</span>
-        </article>
-      `).join('') : `<div class="empty">${escapeHtml(emptyText)}</div>`}
-    </section>
-  `;
-}
-
-function renderStructure() {
-  const target = $('structure-view');
-  if (!target) return;
-  const structure = getStructure(state.currentBook);
-  if (!structure.generated) {
-    target.innerHTML = '<div class="empty-state large-empty">A estrutura vem antes da escrita. Gera-a para criar folha de rosto, dedicatória, apresentação, prefácio, introdução, índice, capítulos e elementos finais.</div>';
-    return;
-  }
-  const toc = structure.chapters.map((chapter) => `
-    <div class="toc-row"><span>Capítulo ${escapeHtml(chapter.number)}</span><strong>${escapeHtml(chapter.title || 'Sem título')}</strong></div>
-  `).join('');
-  target.innerHTML = `
-    ${structurePart('Antes da história', structure.front_matter, 'Nenhum elemento inicial definido.')}
-    <section class="structure-section">
-      <div class="structure-section-head"><span class="section-label">ÍNDICE</span><span>${structure.chapters.length} capítulos</span></div>
-      <div class="toc-list">${toc || '<div class="empty-state">Ainda não existem capítulos no índice.</div>'}</div>
-    </section>
-    ${structurePart('Capítulos', structure.chapters, 'Nenhum capítulo planeado.')}
-    ${structurePart('Depois da história', structure.back_matter, 'Nenhum elemento final definido.')}
-  `;
-
-  const selector = $('chapter-number');
-  if (selector) {
-    const current = selector.value;
-    selector.innerHTML = structure.chapters.length
-      ? structure.chapters.map((chapter) => `<option value="${escapeHtml(chapter.number)}">${escapeHtml(chapter.number)} · ${escapeHtml(chapter.title || 'Sem título')}</option>`).join('')
-      : '<option value="1">1 · Capítulo 1</option>';
-    selector.value = current && [...selector.options].some((option) => option.value === current)
-      ? current
-      : String(structure.chapters[0]?.number || 1);
-  }
-  updateChapterPlanPreview();
-}
-
-function nextChapterNumber() {
-  const existing = currentChapters(state.currentBook).map((item) => Number(item.chapter_number));
-  const planned = getStructure(state.currentBook).chapters.map((item) => Number(item.number)).filter(Boolean);
-  for (const number of planned) if (!existing.includes(number)) return number;
-  return Math.max(0, ...existing, ...planned) + 1 || 1;
-}
-
-function updateChapterPlanPreview() {
-  const selector = $('chapter-number');
-  const preview = $('chapter-plan-preview');
-  const pill = $('chapter-plan-pill');
-  if (!selector || !preview || !pill) return;
-  const chapterNumber = Number(selector.value || 1);
-  const planned = getStructure(state.currentBook).chapters.find((item) => Number(item.number) === chapterNumber);
-  pill.textContent = planned ? `Capítulo ${chapterNumber}` : 'Sem plano';
-  preview.innerHTML = planned
-    ? `<strong>${escapeHtml(planned.title || `Capítulo ${chapterNumber}`)}</strong><span>${escapeHtml(planned.objective || planned.description || 'Sem objectivo definido.')}</span>`
-    : '<strong>Sem plano para este capítulo.</strong><span>Gera primeiro a estrutura editorial.</span>';
-}
-
-function renderChapters() {
-  const chapters = currentChapters(state.currentBook);
-  $('chapter-count').textContent = chapters.length;
-  const target = $('chapters-list');
-  if (!chapters.length) {
-    target.innerHTML = '<div class="empty-state">Ainda não há capítulos escritos.</div>';
-  } else {
-    target.innerHTML = chapters.map((chapter) => `
-      <button class="chapter-item ${state.selectedChapter?.id === chapter.id ? 'active' : ''}" type="button" data-chapter-id="${escapeHtml(chapter.id)}">
-        <span class="chapter-item-number">${escapeHtml(chapter.chapter_number)}</span>
-        <div><strong>${escapeHtml(chapter.title || 'Sem título')}</strong><small>v${escapeHtml(chapter.version_number)} · ${String(chapter.content ?? '').length.toLocaleString('pt-PT')} caracteres</small></div>
-      </button>
-    `).join('');
-  }
-  target.querySelectorAll('[data-chapter-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      state.selectedChapter = chapters.find((item) => item.id === button.dataset.chapterId) || null;
-      $('chapter-number').value = state.selectedChapter?.chapter_number || 1;
-      updateChapterPlanPreview();
-      renderChapterReader();
-      renderChapters();
-    });
+  document.querySelectorAll('.prepare-step').forEach((item) => {
+    const key = item.dataset.stage;
+    const ready = Boolean(stages[key]);
+    item.classList.toggle('complete', ready);
+    item.querySelector('.step-state').textContent = ready ? 'Concluído' : 'Por fazer';
   });
-  if (!state.selectedChapter && chapters.length) state.selectedChapter = chapters[0];
-  if (state.selectedChapter) {
-    state.selectedChapter = chapters.find((item) => item.id === state.selectedChapter.id) || chapters[0] || null;
-    $('chapter-number').value = state.selectedChapter?.chapter_number || $('chapter-number').value || 1;
-  }
-  updateChapterPlanPreview();
-  renderChapterReader();
+
+  const research = book?.research_notes?.[0];
+  $('research-view').innerHTML = research
+    ? '<strong>Pesquisa criada.</strong><p>' + escapeHtml(research.title || 'Relatório de pesquisa') + '</p>'
+    : '<p class="reader-empty">Ainda não existe pesquisa.</p>';
+
+  const bible = book.story_bible;
+  $('bible-view').innerHTML = bible
+    ? '<strong>Story Bible criada.</strong><p>Personagens, mundo, relações e continuidade estão disponíveis para a escrita.</p>'
+    : '<p class="reader-empty">Ainda não existe uma Story Bible.</p>';
+
+  $('structure-view').innerHTML = structure.chapters.length
+    ? '<strong>Índice criado.</strong><p>' + structure.chapters.length + ' capítulos planeados.</p>'
+    : '<p class="reader-empty">Ainda não existe estrutura.</p>';
 }
 
-function renderChapterReader() {
-  const chapter = state.selectedChapter;
-  if (!chapter) {
-    $('selected-chapter-title').textContent = 'Nenhum capítulo seleccionado';
-    $('selected-chapter-meta').textContent = '—';
-    $('selected-chapter-content').className = 'chapter-content empty-state';
-    $('selected-chapter-content').textContent = 'Quando tiveres texto, ele aparece aqui com uma leitura limpa.';
-    return;
-  }
-  $('selected-chapter-title').textContent = `Capítulo ${chapter.chapter_number} · ${chapter.title || 'Sem título'}`;
-  $('selected-chapter-meta').textContent = `versão ${chapter.version_number} · ${String(chapter.content ?? '').length.toLocaleString('pt-PT')} caracteres`;
-  $('selected-chapter-content').className = 'chapter-content';
-  const paragraphs = String(chapter.content || 'Sem conteúdo.')
-    .replace(/\r/g, '')
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  $('selected-chapter-content').innerHTML = paragraphs.length
-    ? paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`).join('')
-    : '<p>Sem conteúdo.</p>';
+function structureItem(item, index) {
+  return '<div class="structure-row">'
+    + '<span>' + escapeHtml(item.number || String(index + 1)) + '</span>'
+    + '<div><strong>' + escapeHtml(item.title || 'Sem título') + '</strong>'
+    + '<p>' + escapeHtml(item.objective || item.description || item.content || '') + '</p></div>'
+    + '</div>';
 }
 
 function renderWriting() {
   const book = state.currentBook;
-  $('writing-stage').textContent = book ? statusLabel(book.status) : 'Sem livro';
-  $('writing-stage').className = `status-badge ${statusClass(book?.status)}`;
-  renderStructure();
-  renderChapters();
+  const structure = bookStructure(book);
+  const hasPlan = Boolean(book && structure.chapters.length);
+
+  $('writing-empty').classList.toggle('hidden', hasPlan);
+  $('writing-book').classList.toggle('hidden', !hasPlan);
+
+  const writeButton = $('write-next');
+  writeButton.disabled = !hasPlan || state.busy;
+
+  if (!hasPlan) return;
+
+  const chapters = currentChapters(book);
+  $('chapter-count').textContent = countText(structure.chapters.length) + ' capítulos';
+
+  const rows = structure.chapters.map((chapter) => {
+    const number = Number(chapter.number);
+    const existing = chapters.find((item) => Number(item.chapter_number) === number);
+    const active = state.selectedChapter?.id === existing?.id && existing;
+    const actionText = existing ? 'Abrir' : 'Escrever';
+    return '<button class="plan-row ' + (active ? 'active' : '') + '" type="button" data-chapter-plan="' + number + '">'
+      + '<span class="plan-number">' + escapeHtml(number) + '</span>'
+      + '<span class="plan-main"><strong>' + escapeHtml(chapter.title || 'Sem título') + '</strong>'
+      + '<small>' + escapeHtml(chapter.objective || 'Plano ainda sem objectivo.') + '</small></span>'
+      + '<span class="plan-state">' + actionText + '</span>'
+      + '</button>';
+  }).join('');
+
+  $('chapter-plan').innerHTML = rows || '<p class="reader-empty">Sem capítulos planeados.</p>';
+
+  document.querySelectorAll('[data-chapter-plan]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const number = Number(button.dataset.chapterPlan);
+      const existing = chapters.find((item) => Number(item.chapter_number) === number);
+      if (existing) {
+        state.selectedChapter = existing;
+        renderWriting();
+      } else {
+        writeChapter(number).catch((error) => setGlobal(error.message, 'error'));
+      }
+    });
+  });
+
+  if (!state.selectedChapter) {
+    state.selectedChapter = chapters[0] || null;
+  }
+
+  if (state.selectedChapter) {
+    const fresh = chapters.find((item) => item.id === state.selectedChapter.id);
+    state.selectedChapter = fresh || state.selectedChapter;
+  }
+
+  const chapter = state.selectedChapter;
+  $('selected-chapter-title').textContent = chapter
+    ? 'Capítulo ' + chapter.chapter_number + ' · ' + (chapter.title || 'Sem título')
+    : 'Selecciona um capítulo';
+  $('selected-chapter-meta').textContent = chapter
+    ? 'versão ' + (chapter.version_number ?? '—') + ' · ' + countText(String(chapter.content ?? '').length) + ' caracteres'
+    : '—';
+
+  const paragraphs = String(chapter?.content || '')
+    .replace(/\r/g, '')
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  $('selected-chapter-content').innerHTML = paragraphs.length
+    ? paragraphs.map((part) => '<p>' + escapeHtml(part).replace(/\n/g, '<br>') + '</p>').join('')
+    : '<p class="reader-empty">Quando escreveres este capítulo, o texto aparece aqui.</p>';
+
+  const front = structure.front_matter.filter((item) => item && item.included !== false);
+  const back = structure.back_matter.filter((item) => item && item.included !== false);
+  $('structure-full-view').innerHTML = ''
+    + '<section class="structure-group"><h3>Antes da história</h3>'
+    + (front.length ? front.map(structureItem).join('') : '<p class="reader-empty">Sem elementos iniciais.</p>')
+    + '</section>'
+    + '<section class="structure-group"><h3>Índice e capítulos</h3>'
+    + structure.chapters.map(structureItem).join('')
+    + '</section>'
+    + '<section class="structure-group"><h3>Depois da história</h3>'
+    + (back.length ? back.map(structureItem).join('') : '<p class="reader-empty">Sem elementos finais.</p>')
+    + '</section>';
 }
 
-function renderQualityPlaceholders() {
-  for (const id of ['continuity-view', 'qa-view', 'originality-view']) {
-    const node = $(id);
-    if (!node?.dataset.hasResult) node.innerHTML = '<div class="empty-state">Ainda não existe um relatório.</div>';
+function renderReview() {
+  $('review-all').disabled = !state.currentBook || state.busy;
+  if (!state.currentBook) {
+    ['continuity-view', 'qa-view', 'originality-view'].forEach((id) => {
+      $(id).innerHTML = '<p class="reader-empty">Selecciona um livro.</p>';
+    });
   }
 }
 
-async function renderProduction() {
+function renderPublication() {
   const book = state.currentBook;
   if (!book) {
-    $('files-view').innerHTML = '<div class="empty-state">Selecciona um livro primeiro.</div>';
-    $('covers-view').innerHTML = '';
-    $('publication-status').innerHTML = '<strong>Sem livro</strong><p>Escolhe um livro antes de preparar a publicação.</p>';
+    $('publication-status').innerHTML = '<strong>Sem livro.</strong><p>Selecciona um projecto primeiro.</p>';
+    $('files-view').innerHTML = '<p class="reader-empty">Selecciona um livro.</p>';
+    $('covers-view').innerHTML = '<p class="reader-empty">Selecciona um livro.</p>';
     return;
   }
+
   $('publication-price').value = Number(book.price_usd || 0).toFixed(2);
-  $('sales-price').textContent = money(book.price_usd, book.currency || 'USD');
-  $('publication-status').innerHTML = `<span class="eyebrow">ESTADO</span><strong>${escapeHtml(statusLabel(book.status))}</strong><p>${book.status === 'published' ? 'O livro está publicado.' : 'Ainda não está publicado.'}</p>`;
-  document.querySelectorAll('.status-button').forEach((button) => button.classList.toggle('active', button.dataset.status === book.status));
-  loadFiles(book.slug).catch((error) => setInline('publication-status-note', error.message, 'error'));
-  loadSales(book.id).catch((error) => setInline('publication-status-note', error.message, 'error'));
-  loadCovers(book.id).catch((error) => setStatus(error.message, 'error'));
+  $('publication-status').innerHTML = '<strong>' + escapeHtml(statusLabel(book.status)) + '</strong>'
+    + '<p>' + (book.status === 'published'
+      ? 'O livro está publicado.'
+      : 'Guarda em “Em revisão” quando terminares a verificação.') + '</p>';
+
+  document.querySelectorAll('.status-button').forEach((button) => {
+    button.classList.toggle('active', button.dataset.status === book.status);
+  });
+
+  loadFiles();
+  loadCovers();
 }
 
-async function loadFiles(slug) {
-  const data = await api(`/api/admin/files?book_id=${encodeURIComponent(state.currentBook.id)}`);
-  const target = $('files-view');
-  if (!target) return;
-  const published = state.currentBook.status === 'published';
-  target.innerHTML = `
-    <strong>${escapeHtml(data.chapters || 0)} capítulos actuais</strong>
-    <span class="file-note">PDF e EPUB são gerados sob pedido a partir do manuscrito.</span>
-    ${published ? `<div class="file-links"><a href="/api/books/${encodeURIComponent(slug)}/download?format=pdf">Abrir PDF</a><a href="/api/books/${encodeURIComponent(slug)}/download?format=epub">Abrir EPUB</a></div>` : '<span class="file-note">Publica o livro para activar os downloads.</span>'}
-  `;
+async function loadFiles() {
+  if (!state.currentBook) return;
+  const data = await api('/api/admin/files?book_id=' + encodeURIComponent(state.currentBook.id));
+  const canOpen = state.currentBook.status === 'published';
+  $('files-view').innerHTML = ''
+    + '<strong>' + countText(data.chapters) + ' capítulos actuais</strong>'
+    + '<p>' + escapeHtml(data.note || 'PDF e EPUB são gerados a pedido.') + '</p>'
+    + (canOpen
+      ? '<div class="file-links"><a href="/api/books/' + encodeURIComponent(state.currentBook.slug) + '/download?format=pdf">Abrir PDF</a><a href="/api/books/' + encodeURIComponent(state.currentBook.slug) + '/download?format=epub">Abrir EPUB</a></div>'
+      : '<p class="small-muted">Publica o livro para activar os downloads.</p>');
 }
 
-async function loadSales(bookId) {
-  const data = await api(`/api/admin/sales?book_id=${encodeURIComponent(bookId)}`);
-  $('sales-orders').textContent = data.orders;
-  $('sales-revenue').textContent = money(data.revenue, data.currency || 'USD');
-}
-
-async function loadCovers(bookId) {
-  const target = $('covers-view');
-  if (!target) return;
-  const data = await api(`/api/admin/covers?book_id=${encodeURIComponent(bookId)}`);
+async function loadCovers() {
+  if (!state.currentBook) return;
+  const data = await api('/api/admin/covers?book_id=' + encodeURIComponent(state.currentBook.id));
   if (!data.items?.length) {
-    target.innerHTML = '<div class="empty">Ainda não existem capas geradas.</div>';
+    $('covers-view').innerHTML = '<p class="reader-empty">Ainda não existem capas. A geração usa automaticamente os dados do livro.</p>';
     return;
   }
-  target.innerHTML = data.items.map((cover) => `
-    <article class="cover-card ${Number(cover.selected) ? 'selected' : ''}">
-      <div class="cover-preview" data-cover-id="${escapeHtml(cover.id)}"></div>
-      <strong>${Number(cover.selected) ? 'Capa seleccionada' : 'Capa gerada'}</strong>
-      <span>${escapeHtml(cover.model || '')}</span>
-      ${Number(cover.selected) ? '' : `<button class="secondary-button choose-cover" data-cover-id="${escapeHtml(cover.id)}" type="button">Escolher</button>`}
-    </article>
-  `).join('');
 
-  const previews = await Promise.all(data.items.map(async (item) => {
+  $('covers-view').innerHTML = data.items.map((cover) => {
+    const selected = Number(cover.selected) === 1;
+    return '<article class="cover-card ' + (selected ? 'selected' : '') + '">'
+      + '<div class="cover-preview" data-cover-preview="' + escapeHtml(cover.id) + '"></div>'
+      + '<div class="cover-meta"><strong>' + (selected ? 'Capa seleccionada' : 'Capa gerada') + '</strong>'
+      + '<span>' + escapeHtml(cover.model || 'Workers AI') + '</span></div>'
+      + (selected ? '' : '<button class="button button-secondary choose-cover" data-cover-id="' + escapeHtml(cover.id) + '" type="button">Escolher</button>')
+      + '</article>';
+  }).join('');
+
+  const previews = await Promise.all(data.items.map(async (cover) => {
     try {
-      const raw = await api(`/api/admin/covers/preview?cover_id=${encodeURIComponent(item.id)}`);
-      return { id: item.id, dataUri: raw.data_uri };
+      const result = await api('/api/admin/covers/preview?cover_id=' + encodeURIComponent(cover.id));
+      return { id: cover.id, data: result.data_uri };
     } catch {
       return null;
     }
   }));
+
   previews.filter(Boolean).forEach((item) => {
-    const node = target.querySelector(`[data-cover-id="${CSS.escape(item.id)}"]`);
-    if (node) node.style.backgroundImage = `url('${item.dataUri}')`;
+    const node = document.querySelector('[data-cover-preview="' + CSS.escape(item.id) + '"]');
+    if (node) node.style.backgroundImage = "url('" + item.data + "')";
   });
 
-  target.querySelectorAll('.choose-cover').forEach((button) => {
+  document.querySelectorAll('.choose-cover').forEach((button) => {
     button.addEventListener('click', async () => {
-      const finish = setButtonBusy(button, true, 'A escolher…');
+      button.disabled = true;
       try {
-        await api('/api/admin/cover/select', { method: 'POST', body: JSON.stringify({ cover_id: button.dataset.coverId }) });
+        await api('/api/admin/cover/select', {
+          method: 'POST',
+          body: JSON.stringify({ cover_id: button.dataset.coverId }),
+        });
         await selectBook(state.currentBook.id, false);
-        setStatus('Capa seleccionada.', 'success');
+        setGlobal('Capa seleccionada.', 'success');
       } catch (error) {
-        setStatus(error.message, 'error');
+        setGlobal(error.message, 'error');
       } finally {
-        finish();
+        button.disabled = false;
       }
     });
   });
 }
 
-async function loadSeries() {
-  const data = await api('/api/admin/series');
-  state.series = data.items || [];
-  $('series-list').innerHTML = state.series.length ? state.series.map((series) => `
-    <article class="book-row"><div><strong>${escapeHtml(series.name)}</strong><p>${escapeHtml(series.book_count)} livro(s) · ${escapeHtml(series.slug)}</p></div></article>
-  `).join('') : '<div class="empty">Nenhuma série criada.</div>';
-}
-
-async function loadSettings() {
-  try {
-    const data = await api('/api/admin/settings');
-    $('settings-view').innerHTML = `
-      <div class="system-card"><span>IA</span><strong>${data.ai.configured ? 'Ligada' : 'Desligada'}</strong><small>Workers AI</small></div>
-      <div class="system-card"><span>Pesquisa semântica</span><strong>${data.semantic_search.configured ? 'Vectorize' : 'Local'}</strong><small>Motor de pesquisa</small></div>
-      <div class="system-card"><span>Ficheiros</span><strong>PDF + EPUB</strong><small>Geração sob pedido</small></div>
-      <div class="technical-details-box"><strong>Detalhes técnicos</strong><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></div>
-    `;
-  } catch (error) {
-    $('settings-view').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
-  }
-}
-
-async function aiAction(action, extra = {}) {
-  if (!state.currentBook) throw new Error('Selecciona um livro primeiro.');
-  return api('/api/admin/ai', {
+async function createBook(body) {
+  const data = await api('/api/admin/books', {
     method: 'POST',
-    body: JSON.stringify({ action, book_id: state.currentBook.id, ...extra }),
+    body: JSON.stringify({
+      title: body.title.trim(),
+      premise: body.premise.trim(),
+      description: body.premise.trim(),
+      author: state.user?.name || 'Nexauren',
+      language: 'pt-PT',
+      approx_chapter_count: 12,
+    }),
   });
+  await loadBooks();
+  await selectBook(data.id, false);
 }
 
-async function runAiButton(button) {
-  const action = button.dataset.ai;
-  const finish = setButtonBusy(button, true, 'A trabalhar…');
-  setStatus('A preparar o próximo passo…', 'busy');
-  try {
-    const extra = {};
-    if (action === 'chapter') {
-      const structure = getStructure(state.currentBook);
-      const chapterNumber = Math.max(1, Number($('chapter-number').value || nextChapterNumber()));
-      const planned = structure.chapters.find((item) => Number(item.number) === chapterNumber);
-      extra.chapter_number = chapterNumber;
-      extra.instructions = $('chapter-instructions').value.trim();
-      extra.language = state.currentBook?.language || 'pt-PT';
-      if (planned?.title) {
-        extra.title = planned.title;
-        extra.instructions = `${extra.instructions}\n\nTítulo obrigatório: ${planned.title}`.trim();
-      }
-    }
-    const data = await aiAction(action, extra);
+async function prepareBook() {
+  if (!state.currentBook) throw new Error('Cria ou selecciona um livro primeiro.');
 
-    if (action === 'research') {
-      renderCompactAI('research-view', data.report, 'Pesquisa da ideia');
-      await selectBook(state.currentBook.id, false);
-      setStatus('Pesquisa concluída e guardada.', 'success');
-      goTo('project');
-      return;
-    }
-    if (action === 'story_bible') {
-      await selectBook(state.currentBook.id, false);
-      setStatus('Story Bible criada e guardada.', 'success');
-      goTo('project');
-      return;
-    }
-    if (action === 'structure') {
-      await selectBook(state.currentBook.id, false);
-      setStatus('Estrutura criada: abertura, índice, capítulos e elementos finais.', 'success');
-      goTo('writing');
-      return;
-    }
-    if (action === 'chapter') {
-      await selectBook(state.currentBook.id, false);
-      const chapter = currentChapters(state.currentBook).find((item) => Number(item.chapter_number) === Number(extra.chapter_number));
-      state.selectedChapter = chapter || null;
-      $('chapter-number').value = extra.chapter_number;
-      renderWriting();
-      if (chapter) {
-        state.selectedChapter = chapter;
-        renderChapterReader();
+  const button = $('prepare-all');
+  state.busy = true;
+  button.disabled = true;
+  button.textContent = 'A preparar…';
+
+  const steps = [
+    ['research', 'research', 'A pesquisar a ideia…'],
+    ['bible', 'story_bible', 'A criar a Story Bible…'],
+    ['structure', 'structure', 'A criar o índice e a estrutura…'],
+  ];
+
+  try {
+    for (const [uiStage, action, message] of steps) {
+      const row = document.querySelector('.prepare-step[data-stage="' + uiStage + '"]');
+      if (row) {
+        row.classList.add('working');
+        row.querySelector('.step-state').textContent = message.replace('A ', '').replace('…', '');
       }
-      setStatus(`Capítulo ${extra.chapter_number} gerado e guardado.`, 'success');
-      goTo('writing');
-      return;
-    }
-    if (action === 'story_state') {
+      setGlobal(message, 'busy');
+      await api('/api/admin/ai', {
+        method: 'POST',
+        body: JSON.stringify({
+          action,
+          book_id: state.currentBook.id,
+        }),
+      });
       await selectBook(state.currentBook.id, false);
-      setStatus('Estado da história actualizado.', 'success');
-      return;
     }
-    if (action === 'continuity') {
-      renderCompactAI('continuity-view', data.report, 'Continuidade');
-      $('continuity-view').dataset.hasResult = '1';
-      goTo('quality');
-      setStatus('Continuidade verificada.', 'success');
-      return;
-    }
-    if (action === 'qa') {
-      renderCompactAI('qa-view', data.qa, 'Revisão');
-      $('qa-view').dataset.hasResult = '1';
-      goTo('quality');
-      setStatus('Revisão concluída.', 'success');
-      return;
-    }
-    if (action === 'originality') {
-      renderCompactAI('originality-view', data.originality, 'Originalidade');
-      $('originality-view').dataset.hasResult = '1';
-      goTo('quality');
-      setStatus('Verificação de originalidade concluída.', 'success');
-      return;
-    }
-    if (action === 'seo') {
-      renderCompactAI('seo-view', data.seo, 'SEO');
-      setStatus('SEO gerado e guardado.', 'success');
-      goTo('production');
-      return;
-    }
+
+    setGlobal('Livro preparado. O índice e os capítulos já estão prontos.', 'success');
+    goTo('writing');
   } catch (error) {
-    setStatus(error.message, 'error');
+    setGlobal(error.message, 'error');
   } finally {
-    finish();
+    state.busy = false;
+    button.disabled = false;
+    button.textContent = 'Preparar com IA';
+    renderPrepare();
   }
 }
 
-function startNewBook() {
-  clearNewBookForm();
-  goTo('project');
+async function writeChapter(number) {
+  if (!state.currentBook) throw new Error('Selecciona um livro primeiro.');
+  if (state.busy) return;
+
+  const structure = bookStructure(state.currentBook);
+  const planned = structure.chapters.find((item) => Number(item.number) === Number(number));
+  if (!planned) throw new Error('Este capítulo ainda não está no índice.');
+
+  state.busy = true;
+  $('write-next').disabled = true;
+  setGlobal('A escrever o capítulo ' + number + '…', 'busy');
+
+  try {
+    await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'chapter',
+        book_id: state.currentBook.id,
+        chapter_number: Number(number),
+        title: planned.title || ('Capítulo ' + number),
+        language: 'pt-PT',
+      }),
+    });
+    await loadBooks();
+    await selectBook(state.currentBook.id, false);
+    const fresh = currentChapters(state.currentBook).find(
+      (item) => Number(item.chapter_number) === Number(number),
+    );
+    state.selectedChapter = fresh || null;
+    renderWriting();
+    setGlobal('Capítulo ' + number + ' escrito e guardado.', 'success');
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  } finally {
+    state.busy = false;
+    renderWriting();
+  }
 }
 
-document.querySelectorAll('.ai-action').forEach((button) => {
-  button.addEventListener('click', () => runAiButton(button));
-});
+function nextChapterNumber() {
+  const plan = bookStructure(state.currentBook).chapters
+    .map((item) => Number(item.number))
+    .filter(Boolean);
+  const existing = new Set(currentChapters(state.currentBook).map(
+    (item) => Number(item.chapter_number),
+  ));
+  const next = plan.find((number) => !existing.has(number));
+  return next || (plan.length ? Math.max(...plan) + 1 : 1);
+}
 
-document.querySelectorAll('[data-go]').forEach((button) => {
-  if (button.id === 'dashboard-next') return;
-  button.addEventListener('click', () => {
-    const section = button.dataset.go;
-    if (button.dataset.newBook === 'true') {
-      startNewBook();
-      return;
+async function reviewBook() {
+  if (!state.currentBook || state.busy) return;
+  state.busy = true;
+  $('review-all').disabled = true;
+
+  try {
+    const chapters = currentChapters(state.currentBook);
+    const chapterNumber = chapters.length
+      ? Number(chapters[chapters.length - 1].chapter_number)
+      : 1;
+
+    setGlobal('A verificar continuidade…', 'busy');
+    const continuity = await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'continuity',
+        book_id: state.currentBook.id,
+        chapter_number: chapterNumber,
+      }),
+    });
+
+    setGlobal('A executar a revisão geral…', 'busy');
+    const qa = await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'qa',
+        book_id: state.currentBook.id,
+      }),
+    });
+
+    setGlobal('A comparar originalidade…', 'busy');
+    const originality = await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'originality',
+        book_id: state.currentBook.id,
+      }),
+    });
+
+    renderResult('continuity-view', continuity.report);
+    renderResult('qa-view', qa.qa);
+    renderResult('originality-view', originality.originality);
+
+    if (state.currentBook.status === 'writing') {
+      await api('/api/admin/books/' + encodeURIComponent(state.currentBook.id), {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'review' }),
+      });
+      await loadBooks();
+      await selectBook(state.currentBook.id, false);
     }
-    goTo(section);
-  });
-});
 
-$('dashboard-next')?.addEventListener('click', async () => {
-  const action = $('dashboard-next').dataset.action;
-  if ($('dashboard-next').dataset.newBook === 'true' || action === 'start') {
-    startNewBook();
+    setGlobal('Revisão concluída.', 'success');
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  } finally {
+    state.busy = false;
+    renderReview();
+  }
+}
+
+function renderResult(targetId, value) {
+  const target = $(targetId);
+  if (!target) return;
+
+  if (!value || typeof value !== 'object') {
+    target.innerHTML = '<p>' + escapeHtml(value || 'Sem resultado.') + '</p>';
     return;
   }
-  const section = $('dashboard-next').dataset.go || 'project';
-  goTo(section);
-  if (action && ['research', 'story_bible', 'structure'].includes(action)) {
-    setTimeout(() => document.querySelector(`.ai-action[data-ai="${action}"]`)?.click(), 180);
+
+  const entries = Object.entries(value);
+  target.innerHTML = entries.slice(0, 8).map(([key, item]) => {
+    let output = '';
+    if (Array.isArray(item)) {
+      output = item.length
+        ? '<ul>' + item.slice(0, 10).map((part) => '<li>' + escapeHtml(
+          typeof part === 'object' ? JSON.stringify(part) : part,
+        ) + '</li>').join('') + '</ul>'
+        : '<p class="small-muted">Sem itens.</p>';
+    } else if (typeof item === 'object' && item !== null) {
+      output = '<p>' + escapeHtml(JSON.stringify(item)) + '</p>';
+    } else {
+      output = '<p>' + escapeHtml(item) + '</p>';
+    }
+    return '<div class="result-line"><strong>' + escapeHtml(
+      key.replace(/_/g, ' '),
+    ) + '</strong>' + output + '</div>';
+  }).join('');
+}
+
+async function generateCover() {
+  if (!state.currentBook || state.busy) return;
+  state.busy = true;
+  $('cover-generate').disabled = true;
+  $('cover-generate').textContent = 'A gerar…';
+  setGlobal('A criar uma nova capa…', 'busy');
+  try {
+    await api('/api/admin/cover', {
+      method: 'POST',
+      body: JSON.stringify({
+        book_id: state.currentBook.id,
+      }),
+    });
+    await loadCovers();
+    setGlobal('Capa criada.', 'success');
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  } finally {
+    state.busy = false;
+    $('cover-generate').disabled = false;
+    $('cover-generate').textContent = 'Gerar capa';
   }
-  if (action === 'chapter') {
-    setTimeout(() => {
-      const selector = $('chapter-number');
-      selector.value = String(nextChapterNumber());
-      updateChapterPlanPreview();
-      $('chapter-instructions').focus();
-    }, 180);
+}
+
+async function generateSeo() {
+  if (!state.currentBook || state.busy) return;
+  state.busy = true;
+  $('seo-generate').disabled = true;
+  $('seo-generate').textContent = 'A gerar…';
+  setGlobal('A preparar o SEO…', 'busy');
+  try {
+    const data = await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'seo',
+        book_id: state.currentBook.id,
+      }),
+    });
+    renderResult('seo-view', data.seo);
+    await loadBooks();
+    await selectBook(state.currentBook.id, false);
+    setGlobal('SEO criado e guardado.', 'success');
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  } finally {
+    state.busy = false;
+    $('seo-generate').disabled = false;
+    $('seo-generate').textContent = 'Gerar SEO';
   }
+}
+
+async function savePublication() {
+  if (!state.currentBook || state.busy) return;
+  const status = document.querySelector('.status-button.active')?.dataset.status
+    || state.currentBook.status;
+  const price = Number($('publication-price').value || 0);
+
+  try {
+    await api('/api/admin/books/' + encodeURIComponent(state.currentBook.id), {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status,
+        price_usd: price.toFixed(2),
+      }),
+    });
+    await loadBooks();
+    await selectBook(state.currentBook.id, false);
+    setGlobal('Estado de publicação guardado.', 'success');
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  }
+}
+
+function renderAll() {
+  renderBookOptions();
+  renderDashboard();
+  renderPrepare();
+  renderWriting();
+  renderReview();
+  renderPublication();
+}
+
+document.querySelectorAll('[data-section-link]').forEach((button) => {
+  button.addEventListener('click', () => goTo(button.dataset.sectionLink));
+});
+
+navItems.forEach((button) => {
+  button.addEventListener('click', () => {
+    setNav(button.dataset.section);
+    if (button.dataset.section === 'prepare') renderPrepare();
+    if (button.dataset.section === 'writing') renderWriting();
+    if (button.dataset.section === 'review') renderReview();
+    if (button.dataset.section === 'publish') renderPublication();
+    if (button.dataset.section === 'books') renderBooks();
+  });
+});
+
+document.querySelectorAll('[data-action="new-book"]').forEach((button) => {
+  button.addEventListener('click', () => {
+    state.currentBook = null;
+    state.selectedChapter = null;
+    localStorage.removeItem('nexauren_books_admin_book');
+    $('book-form')?.reset();
+    goTo('prepare');
+    renderAll();
+  });
 });
 
 $('book-context')?.addEventListener('change', async (event) => {
-  try { await selectBook(event.target.value); } catch (error) { setStatus(error.message, 'error'); }
-});
-$('mobile-book-context')?.addEventListener('change', async (event) => {
-  try { await selectBook(event.target.value); } catch (error) { setStatus(error.message, 'error'); }
+  try {
+    await selectBook(event.target.value, true);
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  }
 });
 
-$('chapter-number')?.addEventListener('change', updateChapterPlanPreview);
+$('mobile-book-context')?.addEventListener('change', async (event) => {
+  try {
+    await selectBook(event.target.value, true);
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  }
+});
+
+$('next-button')?.addEventListener('click', () => {
+  const action = $('next-button').dataset.nextAction;
+  const section = $('next-button').dataset.nextSection || 'prepare';
+  if (action === 'new') {
+    state.currentBook = null;
+    state.selectedChapter = null;
+    localStorage.removeItem('nexauren_books_admin_book');
+    $('book-form')?.reset();
+  }
+  goTo(section);
+  setTimeout(() => {
+    if (action === 'prepare' && state.currentBook) $('prepare-all')?.click();
+  }, 120);
+});
 
 $('book-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const title = safeText(form.elements.title?.value);
+  const premise = safeText(form.elements.premise?.value);
+
+  if (!title || !premise) {
+    setInline('book-form-status', 'Indica o título e a ideia do livro.', 'error');
+    return;
+  }
+
   const button = $('book-save');
-  const finish = setButtonBusy(button, true, state.currentBook ? 'A guardar…' : 'A criar…');
+  button.disabled = true;
+  button.textContent = 'A criar…';
+  setInline('book-form-status', 'A criar o projecto…');
   try {
-    const body = formObject(form);
-    if (!body.title?.trim() || !body.premise?.trim()) {
-      throw new Error('Indica pelo menos o título e a ideia do livro.');
-    }
-    body.language = 'pt-PT';
-    if (state.currentBook) {
-      const data = await api(`/api/admin/books/${encodeURIComponent(state.currentBook.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-      });
-      state.currentBook = data.book;
-      await loadBooks();
-      await selectBook(state.currentBook.id, false);
-      setInline('book-form-status', 'Alterações guardadas.', 'success');
-    } else {
-      const data = await api('/api/admin/books', { method: 'POST', body: JSON.stringify(body) });
-      await loadBooks();
-      await selectBook(data.id, false);
-      setInline('book-form-status', 'Projecto criado.', 'success');
-      setStatus('Projecto criado. Agora podes fazer a pesquisa.', 'success');
-    }
+    await createBook({ title, premise });
+    setInline('book-form-status', 'Livro criado.', 'success');
+    setGlobal('Livro criado. Vamos preparar a história.', 'success');
+    goTo('prepare');
   } catch (error) {
     setInline('book-form-status', error.message, 'error');
   } finally {
-    finish();
+    button.disabled = false;
+    button.textContent = 'Criar livro';
   }
 });
 
-$('create-and-research')?.addEventListener('click', async () => {
-  const form = $('book-form');
-  if (!form.reportValidity()) return;
-  const button = $('create-and-research');
-  const finish = setButtonBusy(button, true, 'A preparar…');
-  try {
-    const body = formObject(form);
-    if (!body.title?.trim() || !body.premise?.trim()) throw new Error('Indica o título e a ideia do livro.');
-    body.language = 'pt-PT';
-    if (!state.currentBook) {
-      const data = await api('/api/admin/books', { method: 'POST', body: JSON.stringify(body) });
-      await loadBooks();
-      await selectBook(data.id, false);
-    } else {
-      const data = await api(`/api/admin/books/${encodeURIComponent(state.currentBook.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-      });
-      state.currentBook = data.book;
-      await loadBooks();
-      await selectBook(state.currentBook.id, false);
-    }
-    await runAiButton(document.querySelector('.ai-action[data-ai="research"]'));
-  } catch (error) {
-    setInline('book-form-status', error.message, 'error');
-  } finally {
-    finish();
-  }
-});
-
-$('series-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  try {
-    await api('/api/admin/series', { method: 'POST', body: JSON.stringify(formObject(event.currentTarget)) });
-    event.currentTarget.reset();
-    await loadSeries();
-    setStatus('Série criada.', 'success');
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-});
-
-$('canon-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (!state.currentBook) return setStatus('Selecciona um livro primeiro.', 'error');
-  const body = formObject(event.currentTarget);
-  body.book_id = state.currentBook.id;
-  body.immutable = Boolean(body.immutable);
-  try {
-    await api('/api/admin/canon', { method: 'POST', body: JSON.stringify(body) });
-    await selectBook(state.currentBook.id, false);
-    event.currentTarget.reset();
-    setStatus('Facto guardado.', 'success');
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-});
-
-$('registry-check')?.addEventListener('click', async () => {
-  if (!state.currentBook) return setStatus('Selecciona um livro primeiro.', 'error');
-  const name = $('registry-name').value.trim();
-  if (!name) return setStatus('Indica o nome da entidade.', 'error');
-  let metadata = {};
-  try { metadata = JSON.parse($('registry-meta').value || '{}'); } catch { return setStatus('As notas têm de ser JSON válido.', 'error'); }
-  try {
-    const data = await api('/api/admin/registry/check', {
-      method: 'POST',
-      body: JSON.stringify({ book_id: state.currentBook.id, entity_type: $('registry-type').value, canonical_name: name, metadata }),
-    });
-    $('registry-result').innerHTML = data.candidates?.length
-      ? `<div class="notice"><strong>Possíveis semelhanças</strong>${data.candidates.map((item) => `<p>${escapeHtml(item.canonical_name)} · ${Math.round(item.score * 100)}%</p>`).join('')}</div>`
-      : '<div class="notice">Nenhuma semelhança relevante encontrada no registo local.</div>';
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-});
-
-$('registry-save')?.addEventListener('click', async () => {
-  if (!state.currentBook) return setStatus('Selecciona um livro primeiro.', 'error');
-  const name = $('registry-name').value.trim();
-  if (!name) return setStatus('Indica o nome da entidade.', 'error');
-  let metadata = {};
-  try { metadata = JSON.parse($('registry-meta').value || '{}'); } catch { return setStatus('As notas têm de ser JSON válido.', 'error'); }
-  try {
-    await api('/api/admin/registry', { method: 'POST', body: JSON.stringify({ book_id: state.currentBook.id, entity_type: $('registry-type').value, canonical_name: name, metadata }) });
-    $('registry-name').value = '';
-    $('registry-meta').value = '';
-    setStatus('Entidade guardada.', 'success');
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-});
-
-$('cover-form')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (!state.currentBook) return setStatus('Selecciona um livro primeiro.', 'error');
-  const button = event.currentTarget.querySelector('button');
-  const finish = setButtonBusy(button, true, 'A gerar capa…');
-  try {
-    const body = formObject(event.currentTarget);
-    const data = await api('/api/admin/cover', { method: 'POST', body: JSON.stringify({ book_id: state.currentBook.id, prompt: body.prompt }) });
-    await loadCovers(state.currentBook.id);
-    setStatus(`Capa gerada.`, 'success');
-  } catch (error) {
-    setStatus(error.message, 'error');
-  } finally {
-    finish();
-  }
-});
-
-$('save-publication')?.addEventListener('click', async () => {
-  if (!state.currentBook) return setStatus('Selecciona um livro primeiro.', 'error');
-  const activeStatus = document.querySelector('.status-button.active');
-  const status = activeStatus?.dataset.status || state.currentBook.status;
-  try {
-    const data = await api(`/api/admin/books/${encodeURIComponent(state.currentBook.id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, price_usd: $('publication-price').value }),
-    });
-    state.currentBook = data.book;
-    await loadBooks();
-    await selectBook(state.currentBook.id, false);
-    setStatus('Estado de publicação guardado.', 'success');
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-});
+$('prepare-all')?.addEventListener('click', prepareBook);
+$('write-next')?.addEventListener('click', () => writeChapter(nextChapterNumber()));
+$('review-all')?.addEventListener('click', reviewBook);
+$('cover-generate')?.addEventListener('click', generateCover);
+$('seo-generate')?.addEventListener('click', generateSeo);
+$('save-publication')?.addEventListener('click', savePublication);
 
 document.querySelectorAll('.status-button').forEach((button) => {
   button.addEventListener('click', () => {
@@ -1114,39 +869,52 @@ document.querySelectorAll('.status-button').forEach((button) => {
   });
 });
 
-tabs.forEach((tab) => {
-  tab.addEventListener('click', async () => {
-    const section = tab.dataset.section;
-    tabs.forEach((item) => item.classList.toggle('active', item === tab));
-    views.forEach((view) => view.classList.toggle('hidden', view.id !== `section-${section}`));
-    if (section === 'dashboard') renderDashboard();
-    if (section === 'books') { renderBooksList(); await loadBooks(); }
-    if (section === 'project') renderProject();
-    if (section === 'writing') renderWriting();
-    if (section === 'quality') renderQualityPlaceholders();
-    if (section === 'production') await renderProduction();
-    if (section === 'series') await loadSeries();
-    if (section === 'settings') await loadSettings();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+async function renderBooks() {
+  const target = $('books-list');
+  if (!state.books.length) {
+    target.innerHTML = '<div class="card empty-panel"><h2>Ainda não tens livros.</h2><p>Cria o primeiro projecto para começar.</p></div>';
+    return;
+  }
+  target.innerHTML = state.books.map((book) => '<article class="book-list-row">'
+    + '<div><strong>' + escapeHtml(book.title || 'Sem título') + '</strong>'
+    + '<p>' + escapeHtml(book.author || 'Nexauren') + ' · ' + escapeHtml(statusLabel(book.status)) + '</p></div>'
+    + '<div class="book-row-actions"><span class="status">' + escapeHtml(statusLabel(book.status)) + '</span>'
+    + '<button class="button button-secondary open-book" data-book-id="' + escapeHtml(book.id) + '" type="button">Abrir</button></div>'
+    + '</article>').join('');
+
+  target.querySelectorAll('.open-book').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await selectBook(button.dataset.bookId, true);
+        goTo('dashboard');
+      } catch (error) {
+        setGlobal(error.message, 'error');
+      }
+    });
   });
-});
+}
 
-$('logout')?.addEventListener('click', async () => {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
-  window.location.replace('/admin/login/');
-});
-
-(async () => {
+async function boot() {
   try {
     const user = await ensureAdmin();
-    await Promise.all([loadOverview(), loadBooks()]);
-    renderDashboard();
-    renderProject();
-    renderWriting();
-    renderQualityPlaceholders();
-    setStatus(`Admin ligado: ${user.email}`, 'success');
+    if (!user) return;
+    await loadBooks();
+    renderAll();
   } catch (error) {
-    $('admin-user').textContent = 'Sessão indisponível';
-    setStatus(error.message, 'error');
+    setGlobal(error.message, 'error');
   }
-})();
+}
+
+$('logout')?.addEventListener('click', async () => {
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+  } finally {
+    window.location.replace('/admin/login/');
+  }
+});
+
+boot();
