@@ -2,11 +2,143 @@
 <html lang="pt">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=/books/">
-  <meta name="robots" content="noindex">
-  <link rel="canonical" href="/">
-  <title>Nexauren Story — Livros</title>
-  <script>location.replace("/books/" + location.search);</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Nexauren Story é uma livraria digital dedicada a livros, autores e edições digitais.">
+  <meta name="theme-color" content="#fbf6ec">
+  <meta property="og:title" content="Nexauren Story — Livros para descobrir">
+  <meta property="og:description" content="Uma livraria digital focada em livros, autores e edições digitais.">
+  <title>Nexauren Story — Livros para descobrir</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/books/books.css">
 </head>
-<body><p>A abrir a Nexauren Story…</p></body>
+<body>
+<a class="skip-link" href="#main">Saltar para o conteúdo</a>
+<header class="books-header">
+  <div class="book-shell nav-row">
+    <a class="books-brand" href="/" aria-label="Nexauren Story">
+      <span class="brand-symbol">N</span>
+      <span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span>
+    </a>
+    <button class="books-menu-toggle" type="button" aria-expanded="false" aria-controls="books-nav">
+      <span></span><span></span><span></span><span class="sr-only">Abrir menu</span>
+    </button>
+    <nav id="books-nav" class="books-nav" aria-label="Navegação principal">
+      <a class="active" href="/">Livros</a>
+      <a href="/books/store/">Loja</a>
+      <a href="/books/categories/">Categorias</a>
+      <a href="/books/library/">Biblioteca</a>
+      <a href="/legal/about.html">Sobre</a>
+    </nav>
+    <div class="header-actions">
+      <form class="header-search" id="global-search" role="search">
+        <label class="sr-only" for="header-search-input">Pesquisar livros</label>
+        <input id="header-search-input" type="search" placeholder="Pesquisar livros" autocomplete="off">
+        <button type="submit" aria-label="Pesquisar">⌕</button>
+      </form>
+      <a class="books-account" data-account-link href="/account/">Entrar</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="book-shell hero-grid">
+      <div>
+        <p class="eyebrow">NEXAUREN STORY · LIVRARIA DIGITAL</p>
+        <h1>Livros para <em>descobrir.</em> Histórias para levar consigo.</h1>
+        <p class="hero-text">Uma casa digital feita só para livros: descubra títulos, conheça autores e guarde as suas edições numa biblioteca pessoal.</p>
+        <div class="hero-actions">
+          <a class="book-button primary" href="/books/store/">Explorar a loja →</a>
+          <a class="book-button soft" href="/books/categories/">Ver categorias</a>
+        </div>
+        <p class="hero-note">Edições digitais · PDF e EPUB · Biblioteca pessoal</p>
+      </div>
+      <div class="book-stage" aria-label="Composição visual de capas da Nexauren Story" role="img">
+        <div class="stage-card stage-one"><small>NEXAUREN STORY</small><strong>THE<br>QUIET<br>PATH</strong></div>
+        <div class="stage-card stage-two"><small>ORIGINAL EDITION</small><strong>NEW<br>WORLDS</strong></div>
+        <div class="stage-card stage-three"><small>NEXAUREN STORY · BOOKS</small><strong>READ<br>MORE.</strong></div>
+        <span class="stage-label one">Descobrir · Ler · Guardar</span>
+        <span class="stage-label two">PDF · EPUB</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="trust-strip" aria-label="Características da livraria">
+    <div class="book-shell trust-grid">
+      <div class="trust-item"><strong>Foco total em livros</strong><span>A loja não mistura outras categorias.</span></div>
+      <div class="trust-item"><strong>Descoberta simples</strong><span>Pesquisa, géneros e filtros claros.</span></div>
+      <div class="trust-item"><strong>Prévia e formatos</strong><span>Informação editorial antes da compra.</span></div>
+      <div class="trust-item"><strong>Biblioteca pessoal</strong><span>As compras ficam ligadas à sua conta.</span></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="featured-title">
+    <div class="book-shell">
+      <div class="section-heading">
+        <div><p class="eyebrow">CATÁLOGO</p><h2 id="featured-title">Comece por uma boa história.</h2></div>
+        <p>Os títulos publicados aparecem automaticamente a partir do catálogo real da Nexauren Story.</p>
+      </div>
+      <div id="featured-books" class="book-grid">
+        <div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">Aa</div><strong>A procurar livros…</strong><p>A carregar o catálogo publicado.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" aria-labelledby="categories-title">
+    <div class="book-shell">
+      <div class="section-heading">
+        <div><p class="eyebrow">ESTANTES</p><h2 id="categories-title">Encontre pelo tipo de leitura.</h2></div>
+        <a class="book-button soft" href="/books/categories/">Ver todas as categorias</a>
+      </div>
+      <div class="category-grid">
+        <a class="category-card" href="/books/store/?genre=Fiction"><span class="category-no">01</span><strong>Ficção</strong><small>Romances, dramas e narrativas.</small></a>
+        <a class="category-card" href="/books/store/?genre=Fantasy"><span class="category-no">02</span><strong>Fantasia</strong><small>Mundos, magia e imaginação.</small></a>
+        <a class="category-card" href="/books/store/?genre=Mystery"><span class="category-no">03</span><strong>Mistério</strong><small>Pistas, perguntas e descobertas.</small></a>
+        <a class="category-card" href="/books/store/?genre=Romance"><span class="category-no">04</span><strong>Romance</strong><small>Relações, encontros e emoções.</small></a>
+        <a class="category-card" href="/books/store/?genre=Science%20Fiction"><span class="category-no">05</span><strong>Ficção científica</strong><small>Ideias, futuro e possibilidade.</small></a>
+        <a class="category-card" href="/books/store/?genre=Poetry"><span class="category-no">06</span><strong>Poesia</strong><small>Palavras em ritmo e sentimento.</small></a>
+        <a class="category-card" href="/books/store/?genre=Personal%20Growth"><span class="category-no">07</span><strong>Desenvolvimento pessoal</strong><small>Conhecimento e crescimento.</small></a>
+        <a class="category-card" href="/books/store/?genre=Education"><span class="category-no">08</span><strong>Educação</strong><small>Guias, estudo e aprendizagem.</small></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="book-shell editorial">
+      <div class="editorial-panel">
+        <p class="eyebrow">NEXAUREN STORY</p>
+        <h2>Uma livraria com uma ideia simples: colocar os livros no centro.</h2>
+        <p>A navegação, a pesquisa, as páginas de livro e a biblioteca existem para tornar mais fácil descobrir, comprar e guardar boas leituras.</p>
+        <div class="inline-actions" style="margin-top:18px"><a class="book-button soft" href="/legal/about.html">Conhecer a Story</a></div>
+      </div>
+      <div class="editorial-list">
+        <div class="editorial-row"><span class="num">01</span><div><strong>Descobrir sem confusão</strong><span>Pesquise por título, autor, género e idioma.</span></div></div>
+        <div class="editorial-row"><span class="num">02</span><div><strong>Ver antes de comprar</strong><span>Quando existir uma prévia, ela fica ligada diretamente ao livro.</span></div></div>
+        <div class="editorial-row"><span class="num">03</span><div><strong>Guardar o que é seu</strong><span>As compras ficam disponíveis na sua biblioteca digital.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt">
+    <div class="book-shell news-cta">
+      <div><h2>A próxima história pode começar aqui.</h2><p>Abra a loja e explore o catálogo publicado da Nexauren Story.</p></div>
+      <a class="book-button terra" href="/books/store/">Abrir a loja →</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="book-shell footer-grid">
+    <div><a class="books-brand" href="/"><span class="brand-symbol">N</span><span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span></a><p class="footer-note">Uma livraria digital dedicada a livros, autores e edições digitais.</p></div>
+    <div><p class="footer-title">Explorar</p><a href="/books/store/">Loja</a><a href="/books/categories/">Categorias</a><a href="/books/library/">Biblioteca</a></div>
+    <div><p class="footer-title">Story</p><a href="/legal/about.html">Sobre</a><a href="/legal/faq.html">FAQ</a><a href="/account/">Minha conta</a></div>
+    <div><p class="footer-title">Informação</p><a href="/legal/privacy.html">Privacidade</a><a href="/legal/terms.html">Termos</a><a href="/legal/cookies.html">Cookies</a></div>
+  </div>
+  <div class="book-shell footer-bottom"><span>© <span id="year"></span> Nexauren Story</span><span>Livros no centro.</span></div>
+</footer>
+<script src="/scripts/site.js"></script>
+<script src="/books/books.js"></script>
+</body>
 </html>
