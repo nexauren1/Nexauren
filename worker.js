@@ -318,7 +318,7 @@ async function getBookChapters(env, bookId) {
 async function getBookContext(env, bookId) {
   const book = await getBook(env, bookId);
   if (!book) return null;
-  const [chapters, facts, research] = await Promise.all([
+  const [chapters, facts, research, metadata] = await Promise.all([
     getBookChapters(env, bookId),
     env.BOOKS_DB.prepare(
       `SELECT id, fact_key, fact_value, immutable, version,
@@ -331,12 +331,21 @@ async function getBookContext(env, bookId) {
          FROM research_notes WHERE book_id = ?
         ORDER BY created_at DESC LIMIT 50`,
     ).bind(bookId).all(),
+    env.BOOKS_DB.prepare(
+      `SELECT metadata_json, updated_at
+         FROM book_metadata
+        WHERE book_id = ?
+        LIMIT 1`,
+    ).bind(bookId).first(),
   ]);
   return {
     ...book,
     chapters,
     canonical_facts: facts.results || [],
     research_notes: research.results || [],
+    book_metadata: metadata
+      ? safeJsonParse(metadata.metadata_json)
+      : {},
   };
 }
 
