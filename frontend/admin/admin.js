@@ -632,7 +632,7 @@ function renderChapters() {
     target.innerHTML = chapters.map((chapter) => `
       <button class="chapter-item ${state.selectedChapter?.id === chapter.id ? 'active' : ''}" type="button" data-chapter-id="${escapeHtml(chapter.id)}">
         <span class="chapter-item-number">${escapeHtml(chapter.chapter_number)}</span>
-        <div><strong>${escapeHtml(chapter.title || 'Sem título')}</strong><small>v${escapeHtml(chapter.version_number)} · ${Number(chapter.content || '').length.toLocaleString('pt-PT')} caracteres</small></div>
+        <div><strong>${escapeHtml(chapter.title || 'Sem título')}</strong><small>v${escapeHtml(chapter.version_number)} · ${String(chapter.content ?? '').length.toLocaleString('pt-PT')} caracteres</small></div>
       </button>
     `).join('');
   }
@@ -664,7 +664,7 @@ function renderChapterReader() {
     return;
   }
   $('selected-chapter-title').textContent = `Capítulo ${chapter.chapter_number} · ${chapter.title || 'Sem título'}`;
-  $('selected-chapter-meta').textContent = `versão ${chapter.version_number} · ${Number(chapter.content || '').length.toLocaleString('pt-PT')} caracteres`;
+  $('selected-chapter-meta').textContent = `versão ${chapter.version_number} · ${String(chapter.content ?? '').length.toLocaleString('pt-PT')} caracteres`;
   $('selected-chapter-content').className = 'chapter-content';
   const paragraphs = String(chapter.content || 'Sem conteúdo.')
     .replace(/\r/g, '')
