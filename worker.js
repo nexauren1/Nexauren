@@ -361,6 +361,9 @@ function bookTitlePrompt(book) {
     `Age rating: ${book.age_rating || ''}`,
     `Desired size: ${book.desired_size || ''}`,
     `Approximate chapters: ${book.approx_chapter_count || 0}`,
+    `Series name: ${book.book_metadata?.creation?.series_name || ''}`,
+    `Series size: ${book.book_metadata?.creation?.series_size || ''}`,
+    `Chapter size: ${book.book_metadata?.creation?.chapter_size || ''}`,
     `Style: ${book.style || ''}`,
     `POV: ${book.pov || ''}`,
     `Tone: ${book.tone || ''}`,
@@ -983,7 +986,7 @@ async function adminAI(request, env, admin) {
       action,
       bookId,
       'You are the NexaurenBooks Editorial Structure Planner. Create only the editorial skeleton. Use European Portuguese. Keep every text field very short. The system will generate full chapter content later. Return valid JSON only. Include title page, copyright page, dedication, presentation, preface, introduction, contents, chapters, and useful closing elements. For front/back matter, content should normally be empty. For each chapter return a short specific title, objective, character names, location, conflict and result. Never write long paragraphs.',
-      `Book:\n${clip(base, 10000)}\n\nStory Bible:\n${clip(context.story_bible, 18000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Create a concise editorial skeleton now.`,
+      `Book:\n${clip(base, 10000)}\n\nStory Bible:\n${clip(context.story_bible, 18000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 'AI may choose based on the story'}. Target chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}. Series size: ${context.book_metadata?.creation?.series_size || 'not specified'}. Create a concise editorial skeleton now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
     );
@@ -1033,7 +1036,7 @@ async function adminAI(request, env, admin) {
       action,
       bookId,
       `You are the NexaurenBooks Writer. Write exactly one chapter in ${language}. The chapter title is fixed by the approved structure and must not be changed. The Story Bible, locked canonical facts and current Story State are authoritative. Follow the approved chapter plan. Do not change names, ages, relationships, world rules, chronology or knowledge states. Do not add a different chapter number. Return only JSON matching the schema. The content field must contain the chapter prose only; do not repeat the title inside content.`,
-      `Language: ${language}\n\nFixed chapter number: ${chapterNumber}\nFixed chapter title: ${requestedTitle}\n\nStory Bible:\n${clip(context.story_bible, 26000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nRelevant previous chapters:\n${clip(previous, 18000)}\n\nApproved chapter plan:\n${clip(requestedOutline, 9000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 10000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber} now.`,
+      `Language: ${language}\n\nFixed chapter number: ${chapterNumber}\nFixed chapter title: ${requestedTitle}\nTarget chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}\n\nStory Bible:\n${clip(context.story_bible, 26000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nRelevant previous chapters:\n${clip(previous, 18000)}\n\nApproved chapter plan:\n${clip(requestedOutline, 9000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 10000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber} now.`,
       CHAPTER_SCHEMA,
       admin.user_id,
     );
@@ -1339,53 +1342,6 @@ async function adminApi(request, env) {
       createdAt,
     ).run();
 
-    await env.BOOKS_DB.prepare(
-      `INSERT OR IGNORE INTO story_bibles
-        (book_id, identity_json, world_json, characters_json,
-         relations_json, story_json, timeline_json, chapters_json,
-         style_json, continuity_json, continuation_json,
-         canon_locked, version, updated_at)
-       VALUES (?, ?, '{}', '[]', '[]', '{}', '[]', '[]',
-               '{}', '{}', '{}', 0, 1, ?)`,
-    ).bind(
-      id,
-      JSON.stringify({
-        title,
-        subtitle: body?.subtitle || '',
-        language: body?.language || 'en',
-        country_context: body?.country_context || '',
-        genre: body?.genre || '',
-      }),
-      createdAt,
-    ).run();
-    await env.BOOKS_DB.prepare(
-      `INSERT INTO book_metadata
-        (book_id, metadata_json, updated_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(book_id) DO UPDATE SET
-         metadata_json = excluded.metadata_json,
-         updated_at = excluded.updated_at`,
-    ).bind(
-      id,
-      JSON.stringify({
-        creation: {
-          series_name: seriesName,
-          series_size: seriesSize,
-          chapter_size: chapterSize,
-        },
-        publication: {
-          author: String(body?.author || 'Nexauren').trim() || 'Nexauren',
-          language: String(body?.language || 'pt-PT').trim() || 'pt-PT',
-          audience: String(body?.audience || '').trim(),
-          age_rating: String(body?.age_rating || '').trim(),
-          price_usd: price,
-          currency: 'USD',
-          pdf: true,
-          epub: true,
-        },
-      }),
-      createdAt,
-    ).run();
     return json({ ok: true, id, slug }, 201);
   }
 
