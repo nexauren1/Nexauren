@@ -523,6 +523,106 @@ select:focus, input:focus, textarea:focus {
 }
 .inline-status.success { color: var(--green); }
 .inline-status.error, .global-status.error { color: var(--red); }
+
+.creation-activity {
+  position: sticky;
+  top: 88px;
+  z-index: 30;
+  display: grid;
+  gap: 11px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid #c9d8e5;
+  border-radius: 16px;
+  background: rgba(248, 251, 253, .97);
+  box-shadow: 0 12px 28px rgba(31, 41, 55, .08);
+}
+.creation-activity-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.creation-spinner {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  border: 3px solid #d6e1ea;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: creationSpin .8s linear infinite;
+}
+@keyframes creationSpin {
+  to { transform: rotate(360deg); }
+}
+.creation-activity-head strong {
+  display: block;
+  margin-top: 3px;
+  font-size: .9rem;
+}
+.creation-activity-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: .68rem;
+}
+.creation-activity-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e9ef;
+}
+.creation-activity-track span {
+  display: block;
+  width: 34%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: creationProgress 1.35s ease-in-out infinite;
+}
+@keyframes creationProgress {
+  0% { transform: translateX(-115%); }
+  100% { transform: translateX(315%); }
+}
+.creation-activity-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.creation-activity-steps span {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .72);
+  color: var(--muted);
+  font-size: .6rem;
+  font-weight: 800;
+}
+.creation-activity-steps span.current {
+  border-color: #9ab2c9;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+.creation-activity-steps span.done {
+  border-color: #bfd4c8;
+  background: var(--green-soft);
+  color: var(--green);
+}
+.creation-form.is-busy {
+  opacity: .82;
+}
+@media (max-width: 720px) {
+  .creation-activity {
+    top: 76px;
+    padding: 13px;
+  }
+  .creation-activity-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
 .global-status {
   min-height: 22px;
   margin-top: 12px;
