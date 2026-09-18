@@ -767,6 +767,17 @@ function bibleCharacterNames(bible) {
   );
 }
 
+function bibleLocationNames(bible) {
+  const raw = bible?.world?.key_locations || bible?.world?.locations || [];
+  return new Set(
+    (Array.isArray(raw) ? raw : [])
+      .flatMap((item) => typeof item === 'string'
+        ? [item]
+        : [item?.id, item?.name, item?.canonical_name])
+      .filter((item) => String(item || '').trim())
+      .map((item) => String(item).trim().toLowerCase()),
+  );
+}
 function validateStoryBibleQuality(bible) {
   const problems = [];
   const identity = bible.identity || {};
@@ -784,6 +795,7 @@ function validateStoryBibleQuality(bible) {
     ['identity.genre', identity.genre],
     ['identity.logline', identity.logline],
     ['identity.synopsis', identity.synopsis],
+    ['story.premise', story.premise],
     ['story.central_conflict', story.central_conflict],
     ['story.protagonist_goal', story.protagonist_goal],
     ['story.stakes', story.stakes],
@@ -801,18 +813,17 @@ function validateStoryBibleQuality(bible) {
     ['style.tone', style.tone],
     ['continuity.must_not_change', continuity.must_not_change],
     ['continuity.knowledge_boundaries', continuity.knowledge_boundaries],
-    ['continuation.ending', continuation.ending],
+    ['continuation.ending/this_book_ending', continuation.ending || continuation.this_book_ending],
   ];
   for (const [label, value] of requiredText) {
-    if (!nonEmptyText(value)) {
-      problems.push(label + ' está vazio, genérico ou insuficientemente específico');
-    }
+    if (!nonEmptyText(value)) problems.push(label + ' está vazio ou genérico');
   }
 
-  const scope = identity.editorial_scope || identity.planning_targets;
+  const scope = identity.editorial_scope;
   if (!scope || typeof scope !== 'object') {
     problems.push('identity.editorial_scope em falta');
   } else {
+    if (!nonEmptyText(scope.scale, 3)) problems.push('editorial_scope.scale inválido');
     const ranges = [
       ['character_count_target', 1, 100],
       ['relation_count_target', 0, 300],
@@ -826,23 +837,51 @@ function validateStoryBibleQuality(bible) {
         problems.push('editorial_scope.' + key + ' inválido');
       }
     }
+    if (Number(scope.character_count_target) !== characters.length) {
+      problems.push('character_count_target não corresponde ao elenco gerado');
+    }
+    if (Number(scope.relation_count_target) !== relations.length) {
+      problems.push('relation_count_target não corresponde às relações geradas');
+    }
+    if (Number(scope.timeline_milestone_target) !== timeline.length) {
+      problems.push('timeline_milestone_target não corresponde à cronologia gerada');
+    }
   }
 
   if (characters.length < 1 || characters.length > 100) {
     problems.push('o elenco deve conter entre 1 e 100 personagens');
   }
+  const characterIds = new Set();
+  const characterNames = new Set();
   for (let index = 0; index < characters.length; index += 1) {
     const character = characters[index];
     const prefix = 'characters[' + index + ']';
-    if (!nonEmptyText(character?.id, 2)) problems.push(prefix + '.id inválido');
-    if (!nonEmptyText(character?.name, 2)
-      || /^personagem\s+\d+$/i.test(String(character?.name || ''))) {
-      problems.push(prefix + '.name inválido ou placeholder');
-    }
+    const id = String(character?.id || '').trim().toLowerCase();
+    const name = String(character?.name || character?.canonical_name || '').trim().toLowerCase();
+    if (!nonEmptyText(id, 2)) problems.push(prefix + '.id inválido');
+    if (!nonEmptyText(name, 2)) problems.push(prefix + '.name inválido');
+    if (id && characterIds.has(id)) problems.push(prefix + '.id duplicado');
+    if (name && characterNames.has(name)) problems.push(prefix + '.name duplicado');
+    characterIds.add(id);
+    characterNames.add(name);
     for (const key of ['role', 'wants', 'needs', 'fears', 'flaws', 'strengths', 'arc']) {
-      if (!nonEmptyText(character?.[key], 4)) {
-        problems.push(prefix + '.' + key + ' está vazio ou genérico');
-      }
+      if (!nonEmptyText(character?.[key], 4)) problems.push(prefix + '.' + key + ' vazio ou genérico');
+    }
+  }
+
+  const locationValues = world.key_locations || world.locations || [];
+  if (!Array.isArray(locationValues) || !locationValues.length) {
+    problems.push('world.key_locations em falta');
+  } else {
+    for (let index = 0; index < locationValues.length; index += 1) {
+      const item = locationValues[index];
+      const value = typeof item === 'string'
+        ? item : item?.name || item?.canonical_name;
+      if (!nonEmptyText(value, 3)) problems.push('world.key_locations[' + index + '] inválido');
+    }
+    if (scope && Number.isInteger(Number(scope.location_count_target))
+      && locationValues.length !== Number(scope.location_count_target)) {
+      problems.push('location_count_target não corresponde aos locais gerados');
     }
   }
 
@@ -852,52 +891,40 @@ function validateStoryBibleQuality(bible) {
   for (let index = 0; index < timeline.length; index += 1) {
     const event = timeline[index];
     for (const key of ['event', 'cause', 'consequence']) {
-      if (!nonEmptyText(event?.[key], 5)) {
-        problems.push('timeline[' + index + '].' + key + ' está vazio');
-      }
+      if (!nonEmptyText(event?.[key], 5)) problems.push('timeline[' + index + '].' + key + ' vazio');
     }
   }
 
   const names = bibleCharacterNames(bible);
   for (let index = 0; index < relations.length; index += 1) {
     const relation = relations[index];
-    const from = String(relation?.from_character_id || relation?.from || '')
-      .trim().toLowerCase();
-    const to = String(relation?.to_character_id || relation?.to || '')
-      .trim().toLowerCase();
-    if (from && !names.has(from)) problems.push('relations[' + index + '] referencia personagem inexistente');
-    if (to && !names.has(to)) problems.push('relations[' + index + '] referencia personagem inexistente');
+    const from = String(relation?.from_character_id || relation?.from || '').trim().toLowerCase();
+    const to = String(relation?.to_character_id || relation?.to || '').trim().toLowerCase();
+    if (!from || !names.has(from)) problems.push('relations[' + index + '] referencia personagem de origem inexistente');
+    if (!to || !names.has(to)) problems.push('relations[' + index + '] referencia personagem de destino inexistente');
+    if (!nonEmptyText(relation?.type || relation?.dynamic || relation?.evolution, 3)) {
+      problems.push('relations[' + index + '] não descreve a relação');
+    }
   }
 
   const genre = String(identity.genre || '').toLowerCase();
   if (/ficcao cientifica|sci[- ]?fi/.test(genre)) {
     const speculative = world.technology || world.speculative_element || world.phenomenon;
-    if (!nonEmptyText(speculative, 8)) {
-      problems.push('a ficção científica precisa de um elemento especulativo concreto');
-    }
+    if (!nonEmptyText(speculative, 8)) problems.push('a ficção científica precisa de um elemento especulativo concreto');
   }
 
-  const storyText = JSON.stringify(story).toLowerCase();
-  if (storyText.includes('conclusão do projeto')
-    || storyText.includes('superar fracassos e criar algo grande')) {
-    problems.push('a Bíblia contém formulações genéricas em vez de decisões narrativas concretas');
-  }
   return problems;
 }
 
-function validateAIResponse(action, response) {
+function validateAIResponse(action, response, qualityContext = null) {
   if (!response || typeof response !== 'object') {
     throw new Error('A resposta da IA está vazia ou malformada.');
   }
 
   if (action === 'story_bible') {
     const requiredObjects = ['identity', 'story', 'world', 'style', 'continuity', 'continuation'];
-    const missing = requiredObjects.filter((key) => !response[key]
-      || typeof response[key] !== 'object');
-    if (missing.length
-      || !Array.isArray(response.characters)
-      || !Array.isArray(response.relations)
-      || !Array.isArray(response.timeline)) {
+    const missing = requiredObjects.filter((key) => !response[key] || typeof response[key] !== 'object');
+    if (missing.length || !Array.isArray(response.characters) || !Array.isArray(response.relations) || !Array.isArray(response.timeline)) {
       throw new Error('A Bíblia Oficial recebida está incompleta.');
     }
     const problems = validateStoryBibleQuality(response);
@@ -911,16 +938,22 @@ function validateAIResponse(action, response) {
       throw new Error('A estrutura recebida não contém capítulos.');
     }
     const numbers = response.chapters.map((item) => Number(item?.number));
-    if (numbers.some((number) => !Number.isInteger(number))
-      || new Set(numbers).size !== numbers.length) {
+    if (numbers.some((number) => !Number.isInteger(number)) || new Set(numbers).size !== numbers.length) {
       throw new Error('A estrutura recebida contém capítulos inválidos.');
     }
     const sorted = [...numbers].sort((a, b) => a - b);
-    const contiguous = sorted.every((number, index) => number === index + 1);
-    if (!contiguous || sorted.length < 6 || sorted.length > 40) {
+    if (!sorted.every((number, index) => number === index + 1) || sorted.length < 6 || sorted.length > 40) {
       throw new Error('A estrutura deve conter capítulos consecutivos do 1 até ao último capítulo.');
     }
-    const characterNames = bibleCharacterNames(response.story_bible || {});
+    if (!response.book_plan || typeof response.book_plan !== 'object') {
+      throw new Error('A estrutura não definiu o plano editorial do livro.');
+    }
+    const plannedCount = Number(response.book_plan.chapter_count);
+    if (!Number.isInteger(plannedCount) || plannedCount !== sorted.length) {
+      throw new Error('A contagem de capítulos do plano não corresponde ao índice.');
+    }
+    const characterNames = bibleCharacterNames(qualityContext || {});
+    const locationNames = bibleLocationNames(qualityContext || {});
     for (const item of response.chapters) {
       for (const key of ['title', 'arc_role', 'objective', 'location', 'conflict', 'turning_point', 'result', 'cause_forward']) {
         if (!nonEmptyText(item?.[key], 6)) {
@@ -930,20 +963,14 @@ function validateAIResponse(action, response) {
       if (!Array.isArray(item.characters) || !item.characters.length) {
         throw new Error('O capítulo ' + item.number + ' precisa de personagens definidos no plano.');
       }
-      if (characterNames.size) {
-        for (const name of item.characters) {
-          if (!characterNames.has(String(name).trim().toLowerCase())) {
-            throw new Error('O capítulo ' + item.number + ' referencia uma personagem que não existe na Bíblia.');
-          }
+      for (const name of item.characters) {
+        if (characterNames.size && !characterNames.has(String(name).trim().toLowerCase())) {
+          throw new Error('O capítulo ' + item.number + ' referencia uma personagem que não existe na Bíblia.');
         }
       }
-    }
-    if (!response.book_plan || typeof response.book_plan !== 'object') {
-      throw new Error('A estrutura não definiu o plano editorial do livro.');
-    }
-    const plannedCount = Number(response.book_plan.chapter_count);
-    if (plannedCount !== sorted.length) {
-      throw new Error('A contagem de capítulos do plano não corresponde ao índice.');
+      if (locationNames.size && !locationNames.has(String(item.location).trim().toLowerCase())) {
+        throw new Error('O capítulo ' + item.number + ' referencia um local que não existe na Bíblia.');
+      }
     }
   }
 
