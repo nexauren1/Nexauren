@@ -731,7 +731,11 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       systemPrompt,
       userPrompt,
       structured = true,
-      maxTokens = 8000,
+      maxTokens = action === 'chapter'
+        ? 8000
+        : action === 'story_bible'
+          ? 5000
+          : 4500,
     ) => env.AI.run(
       TEXT_MODEL,
       {
@@ -768,7 +772,11 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         system,
         [user, compactRule].join('\\n\\n'),
         true,
-        8000,
+        action === 'chapter'
+          ? 8000
+          : action === 'story_bible'
+            ? 5000
+            : 4500,
       );
       response = validateAIResponse(
         action,
@@ -794,7 +802,11 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         'RETRY: JSON compacto, completo e válido.',
       ].join('\\n');
 
-      const retryTokens = action === 'chapter' ? 8000 : 7000;
+      const retryTokens = action === 'chapter'
+        ? 8000
+        : action === 'story_bible'
+          ? 5000
+          : 4500;
 
       try {
         result = await aiRequest(
@@ -824,7 +836,11 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         'Não escrevas nada fora do JSON.',
       ].join('\\n');
 
-      const finalTokens = action === 'chapter' ? 7000 : 5000;
+      const finalTokens = action === 'chapter'
+        ? 7000
+        : action === 'story_bible'
+          ? 4500
+          : 4000;
 
       try {
         result = await aiRequest(
@@ -1103,7 +1119,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Official Story Bible Architect. Create the official creative canon from the author inputs only. The Story Bible becomes the single source of truth for the future book. Never write chapters. Preserve the title, idea, genre, series requirements and chapter-size requirements. Define identity, premise, themes, characters, relationships, world, timeline, style, continuity rules and continuation rules. Use stable IDs. For narrative fiction, include the core protagonist and other necessary characters, meaningful relationships, and at least three concrete timeline milestones. Never return empty core arrays merely to satisfy the schema. Return only JSON matching the schema.',
+      'You are the NexaurenBooks Official Story Bible Architect. Create the official creative canon from the author inputs only. The Story Bible becomes the single source of truth for the future book. Never write chapters. Preserve the title, idea, genre, series requirements and chapter-size requirements. Use stable IDs. For narrative fiction, create only the essential cast: maximum 8 characters, maximum 12 relations and maximum 10 timeline milestones. Keep every text field short, usually 1 to 2 sentences. Never return empty core arrays merely to satisfy the schema. Return only JSON matching the schema.',
       `${base}\n\nBook requirements:\n- Genre: ${context.genre || 'Not specified'}\n- Series name: ${context.series_name || 'Standalone'}\n- Series size: ${context.series_size || 'Not specified'}\n- Chapter size: ${context.chapter_size || context.desired_size || 'Not specified'}\n\nCreate the Official Story Bible now.`,
       STORY_BIBLE_SCHEMA,
       admin.user_id,
@@ -1146,7 +1162,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Editorial Structure Planner. Create only the editorial skeleton. Use European Portuguese. Keep every text field very short. The system will generate full chapter content later. Return valid JSON only. Include title page, copyright page, dedication, presentation, preface, introduction, contents, chapters, and useful closing elements. For front/back matter, content should normally be empty. For each chapter return a short specific title, objective, character names, location, conflict and result. Never write long paragraphs.',
+      'You are the NexaurenBooks Editorial Structure Planner. Create only the editorial skeleton. Use European Portuguese. Keep every text field very short. The system will generate full chapter content later. Return valid JSON only. Plan a normal book of 12 chapters unless the story clearly needs another count, with a hard maximum of 16 chapters. Include only relevant front/back matter. For each chapter return a short title, objective, character names, location, conflict and result. Keep each field to one short sentence. Never write prose paragraphs.',
       `Book:\n${clip(base, 10000)}\n\nStory Bible:\n${clip(context.story_bible, 18000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 'AI may choose based on the story'}. Target chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}. Series size: ${context.book_metadata?.creation?.series_size || 'not specified'}. Create a concise editorial skeleton now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
