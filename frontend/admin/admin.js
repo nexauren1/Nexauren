@@ -285,6 +285,43 @@ function setGlobal(message, kind = '') {
   }
 }
 
+
+function setCreationActivity(active, title = '', detail = '', steps = [], currentStep = 0) {
+  const panel = $('creation-activity');
+  if (!panel) return;
+
+  panel.classList.toggle('hidden', !active);
+  if (!active) {
+    panel.removeAttribute('data-active');
+    return;
+  }
+
+  panel.setAttribute('data-active', 'true');
+  $('creation-activity-title').textContent = title || 'A trabalhar…';
+  $('creation-activity-detail').textContent = detail || '';
+
+  const labels = Array.isArray(steps) && steps.length
+    ? steps.slice(0, 3)
+    : ['A preparar', 'A criar', 'A concluir'];
+
+  for (let i = 0; i < 3; i += 1) {
+    const node = $('creation-step-' + (i + 1));
+    if (!node) continue;
+    node.textContent = labels[i] || '';
+    node.classList.toggle('current', i === currentStep);
+    node.classList.toggle('done', i < currentStep);
+  }
+}
+
+function setFormBusy(formId, busy) {
+  const form = $(formId);
+  if (!form) return;
+  form.classList.toggle('is-busy', busy);
+  form.querySelectorAll('input, select, textarea, button').forEach((field) => {
+    field.disabled = busy;
+  });
+}
+
 function setInline(id, message, kind = '') {
   const node = $(id);
   if (!node) return;
@@ -959,6 +996,17 @@ async function runBibleAction(action, successMessage) {
   $('book-structure').disabled = true;
 
   try {
+    setCreationActivity(
+      true,
+      action === 'approve_bible'
+        ? 'A bloquear a Bíblia Oficial…'
+        : 'A criar a Bíblia Oficial…',
+      action === 'approve_bible'
+        ? 'Estamos a validar a Bíblia e a torná-la a fonte oficial do livro.'
+        : 'A IA está a construir a história e a validar os dados antes de os guardar.',
+      ['Preparar pedido', 'IA a trabalhar', 'Validar resultado'],
+      1,
+    );
     setGlobal('A processar a Bíblia Oficial…', 'busy');
 
     await api('/api/admin/ai', {
@@ -969,6 +1017,13 @@ async function runBibleAction(action, successMessage) {
       }),
     });
 
+    setCreationActivity(
+      true,
+      'Resultado recebido. A finalizar…',
+      'Estamos a guardar a etapa e a actualizar o estúdio.',
+      ['Pedido concluído', 'Resultado recebido', 'Finalizar'],
+      2,
+    );
     await selectBook(state.currentBook.id, false);
     setGlobal(successMessage, 'success');
   } catch (error) {
@@ -1005,6 +1060,13 @@ async function generateStructure() {
   $('book-structure').disabled = true;
 
   try {
+    setCreationActivity(
+      true,
+      'A criar a estrutura do livro…',
+      'A IA está a transformar a Bíblia Oficial num plano de capítulos ligado entre si.',
+      ['Ler Bíblia Oficial', 'Criar estrutura', 'Finalizar plano'],
+      1,
+    );
     setGlobal('A criar a estrutura do livro…', 'busy');
 
     await api('/api/admin/ai', {
@@ -1015,6 +1077,13 @@ async function generateStructure() {
       }),
     });
 
+    setCreationActivity(
+      true,
+      'Estrutura recebida. A finalizar…',
+      'Estamos a guardar o índice e a preparar a escrita.',
+      ['Bíblia lida', 'Plano recebido', 'Finalizar'],
+      2,
+    );
     await selectBook(state.currentBook.id, false);
     setGlobal('Estrutura criada. O próximo passo é escrever os capítulos.', 'success');
     goTo('writing');
@@ -1047,6 +1116,13 @@ async function writeChapter(number) {
 
   state.busy = true;
   $('write-next').disabled = true;
+  setCreationActivity(
+    true,
+    'A escrever o capítulo ' + number + '…',
+    'A IA está a transformar o plano deste capítulo em manuscrito completo.',
+    ['Preparar capítulo', 'Escrever manuscrito', 'Validar resultado'],
+    1,
+  );
   setGlobal('A escrever o capítulo ' + number + '…', 'busy');
 
   try {
@@ -1060,6 +1136,13 @@ async function writeChapter(number) {
         language: state.currentBook.language || 'pt-PT',
       }),
     });
+    setCreationActivity(
+      true,
+      'Capítulo escrito. A validar…',
+      'O manuscrito foi recebido. Estamos a actualizar o livro.',
+      ['Plano concluído', 'Manuscrito recebido', 'Finalizar capítulo'],
+      2,
+    );
     await loadBooks();
     await selectBook(state.currentBook.id, false);
     const fresh = currentChapters(state.currentBook).find(
@@ -1101,6 +1184,13 @@ async function reviewBook() {
       ? Number(chapters[chapters.length - 1].chapter_number)
       : 1;
 
+    setCreationActivity(
+      true,
+      'A rever o livro…',
+      'Estamos a executar as verificações uma a uma. O resultado aparece nesta página.',
+      ['Ver continuidade', 'Rever qualidade', 'Comparar originalidade'],
+      0,
+    );
     setGlobal('A verificar continuidade…', 'busy');
     const continuity = await api('/api/admin/ai', {
       method: 'POST',
@@ -1111,6 +1201,13 @@ async function reviewBook() {
       }),
     });
 
+    setCreationActivity(
+      true,
+      'Continuidade concluída. A rever qualidade…',
+      'Agora a revisão verifica a preparação do manuscrito para publicação.',
+      ['Continuidade concluída', 'Rever qualidade', 'Comparar originalidade'],
+      1,
+    );
     setGlobal('A executar a revisão geral…', 'busy');
     const qa = await api('/api/admin/ai', {
       method: 'POST',
@@ -1120,6 +1217,13 @@ async function reviewBook() {
       }),
     });
 
+    setCreationActivity(
+      true,
+      'Qualidade concluída. A comparar originalidade…',
+      'Estamos a terminar a revisão do livro com a última verificação.',
+      ['Continuidade concluída', 'Qualidade concluída', 'Comparar originalidade'],
+      2,
+    );
     setGlobal('A comparar originalidade…', 'busy');
     const originality = await api('/api/admin/ai', {
       method: 'POST',
@@ -1360,12 +1464,26 @@ $('book-form')?.addEventListener('submit', async (event) => {
   }
 
   const button = $('book-save');
-  button.disabled = true;
   button.textContent = 'A criar…';
-  setInline('book-form-status', 'A guardar os dados do projecto…');
+  setFormBusy('book-form', true);
+  setCreationActivity(
+    true,
+    'A criar o teu projecto…',
+    'Os dados foram recebidos. Estamos a criar o espaço do livro.',
+    ['Receber ficha', 'Criar projecto', 'Preparar próximo passo'],
+    0,
+  );
+  setInline('book-form-status', 'A criar o projecto…');
 
   try {
     await createBook(payload);
+    setCreationActivity(
+      true,
+      'Projecto criado. A preparar o estúdio…',
+      'O livro já existe. Estamos a carregar o próximo passo.',
+      ['Ficha recebida', 'Projecto criado', 'Preparar Bíblia Oficial'],
+      2,
+    );
     setInline(
       'book-form-status',
       'Projecto criado. Agora vem a Bíblia Oficial.',
@@ -1376,7 +1494,8 @@ $('book-form')?.addEventListener('submit', async (event) => {
   } catch (error) {
     setInline('book-form-status', error.message, 'error');
   } finally {
-    button.disabled = false;
+    setCreationActivity(false);
+    setFormBusy('book-form', false);
     button.textContent = 'Criar projecto';
   }
 });
