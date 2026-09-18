@@ -1,19 +1,38 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Your Nexauren Books library — purchased digital books in one focused reading space.">
-  <title>My Library — Nexauren Books</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../books.css">
-  <style>.library-head{padding:70px 0 35px}.library-head h1{font-family:"Playfair Display",serif;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.045em;line-height:1;margin:.3rem 0 1rem}.library-head p{max-width:620px;color:var(--muted)}.library-empty{margin-bottom:100px;padding:4rem 2rem;text-align:center;border:1px dashed #d7cab9;border-radius:28px;background:rgba(255,253,249,.5)}.library-empty h2{font-family:"Playfair Display",serif;font-size:2.2rem;margin:.6rem 0}.library-empty p{max-width:540px;margin:.5rem auto 1.2rem;color:var(--muted)}.library-footer{margin-top:90px}</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minha biblioteca — Nexauren Story</title>
+  <meta name="description" content="A sua biblioteca digital da Nexauren Story.">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/books/books.css">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header class="books-header"><div class="book-shell nav-row"><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><nav class="books-nav" aria-label="Books navigation"><a href="../">Home</a><a href="../store/">Store</a><a href="../categories/">Categories</a><a href="../#how-it-works">About Books</a></nav><a class="books-account" href="../../account/">My account</a></div></header>
-  <main id="main"><section class="book-shell library-head"><p class="books-kicker">NEXAUREN BOOKS · MY LIBRARY</p><h1>Your books, in one place.</h1><p>This page is the Books-specific library view. The underlying Nexauren account remains shared across the platform.</p></section><section class="book-shell library-empty"><div class="empty-mark" aria-hidden="true" style="margin:0 auto">Aa</div><h2>Your library is ready for real purchases.</h2><p>When authenticated purchase records are connected, acquired books can appear here with format, preview and download actions.</p><a class="book-button primary" href="../store/">Explore Books <span aria-hidden="true">→</span></a></section></main>
-  <footer class="books-footer library-footer"><div class="book-shell books-footer-grid"><div><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><p>Focused on books, from discovery to digital delivery.</p></div><div><h3>Books</h3><a href="../">Home</a><a href="../store/">Store</a><a href="../categories/">Categories</a></div><div><h3>Account</h3><a href="../../account/">My account</a><a href="./">My library</a></div><div><h3>Legal</h3><a href="../../legal/privacy.html">Privacy</a><a href="../../legal/terms.html">Terms</a><a href="../../legal/cookies.html">Cookies</a></div></div><div class="book-shell books-footer-bottom"><span>© <span id="year"></span> Nexauren Books</span><span>Library foundation</span></div></footer>
-  <script>document.getElementById('year').textContent=new Date().getFullYear();</script>
-</body>
-</html>
+<header class="books-header"><div class="book-shell nav-row">
+  <a class="books-brand" href="/"><span class="brand-symbol">N</span><span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span></a>
+  <button class="books-menu-toggle" type="button" aria-expanded="false" aria-controls="books-nav"><span></span><span></span><span></span><span class="sr-only">Abrir menu</span></button>
+  <nav id="books-nav" class="books-nav" aria-label="Navegação principal">
+    <a href="/">Livros</a><a href="/books/store/">Loja</a><a href="/books/categories/">Categorias</a><a class="active" href="/books/library/">Biblioteca</a><a href="/legal/about.html">Sobre</a>
+  </nav>
+  <div class="header-actions"><form class="header-search" id="global-search" role="search"><label class="sr-only" for="header-search-input">Pesquisar livros</label><input id="header-search-input" type="search" placeholder="Pesquisar livros"><button type="submit" aria-label="Pesquisar">⌕</button></form><a class="books-account" data-account-link href="/account/">Entrar</a></div>
+</div></header>
+
+<main id="main">
+  <section class="library-shell"><div class="book-shell">
+    <p class="eyebrow">NEXAUREN STORY · MINHA BIBLIOTECA</p>
+    <h1>Os seus livros, num só lugar.</h1>
+    <p class="hero-text" style="max-width:700px">Quando compra um livro, ele fica ligado à sua conta e pode aparecer aqui com os formatos digitais disponíveis.</p>
+    <div id="library-content" class="library-card"><div class="empty-state"><div class="empty-icon">Aa</div><strong>A abrir a biblioteca…</strong><p>A verificar a sua conta e as suas compras.</p></div></div>
+  </div></section>
+</main>
+
+<footer class="site-footer"><div class="book-shell footer-grid">
+  <div><a class="books-brand" href="/"><span class="brand-symbol">N</span><span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span></a><p class="footer-note">A sua biblioteca digital para livros comprados na Nexauren Story.</p></div>
+  <div><p class="footer-title">Explorar</p><a href="/books/store/">Loja</a><a href="/books/categories/">Categorias</a><a href="/books/library/">Biblioteca</a></div>
+  <div><p class="footer-title">Story</p><a href="/legal/about.html">Sobre</a><a href="/legal/faq.html">FAQ</a><a href="/account/">Minha conta</a></div>
+  <div><p class="footer-title">Informação</p><a href="/legal/privacy.html">Privacidade</a><a href="/legal/terms.html">Termos</a></div>
+</div><div class="book-shell footer-bottom"><span>© <span id="year"></span> Nexauren Story</span><span>Biblioteca digital.</span></div></footer>
+<script src="/scripts/site.js"></script><script src="/books/library/library.js"></script>
+</body></html>

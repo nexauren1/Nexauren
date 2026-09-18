@@ -1,108 +1,145 @@
 (() => {
-  const year = document.getElementById('year');
-  if (year) year.textContent = new Date().getFullYear();
-
-  const toggle = document.querySelector('.books-menu-toggle');
-  const nav = document.getElementById('books-nav');
-
-  if (toggle && nav) {
-    toggle.addEventListener('click', () => {
-      const open = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!open));
-      nav.classList.toggle('is-open', !open);
-    });
-
-    nav.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        toggle.setAttribute('aria-expanded', 'false');
-        nav.classList.remove('is-open');
-      });
-    });
-  }
-
-  const homeCatalog = document.getElementById('home-catalog');
-  if (!homeCatalog) return;
+  const host = document.getElementById("featured-books");
+  if (!host) return;
 
   function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#039;',
-      '"': '&quot;',
-    }[char]));
-  }
-
-  function money(value, currency = 'USD') {
-    return Number(value || 0).toLocaleString('en-US', {
-      style: 'currency',
-      currency,
+    return String(value || "").replace(/[&<>'"]/g, function (char) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#039;",
+        '"': "&quot;"
+      }[char];
     });
   }
 
-  function renderBooks(books) {
+  function money(value, currency) {
+    try {
+      return Number(value || 0) > 0
+        ? Number(value).toLocaleString("en-US", {
+          style: "currency",
+          currency: currency || "USD"
+        })
+        : "Grátis";
+    } catch (_) {
+      return Number(value || 0) > 0 ? "$" + Number(value).toFixed(2) : "Grátis";
+    }
+  }
+
+  function render(books) {
     if (!books.length) {
-      homeCatalog.innerHTML = `
-        <div class="catalog-loading empty-live-catalog">
-          <div class="empty-mark" aria-hidden="true">✦</div>
-          <strong>The catalogue is growing.</strong>
-          <span>New published books will appear here automatically.</span>
-          <a class="book-button soft" href="store/">Open Store</a>
-        </div>
-      `;
+      host.innerHTML =
+        '<div class="empty-state" style="grid-column:1/-1">' +
+        '<div class="empty-icon">Aa</div>' +
+        '<strong>A primeira estante está a nascer.</strong>' +
+        '<p>Ainda não há títulos publicados. Assim que um livro for publicado, aparecerá aqui.</p>' +
+        '<a class="book-button soft" href="/books/store/" style="margin-top:15px">Abrir a loja</a>' +
+        '</div>';
       return;
     }
 
-    const featured = books.slice(0, 3);
-    homeCatalog.innerHTML = `
-      <div class="home-catalog-grid">
-        ${featured.map((book) => `
-          <article class="home-book-card">
-            <a href="book/?slug=${encodeURIComponent(book.slug)}" aria-label="Open ${escapeHtml(book.title)}">
-              <div class="home-book-cover" ${book.cover_url ? `style="background-image:url('${encodeURI(book.cover_url)}')"` : ''}>
-                ${book.cover_url ? '' : `<span>NEXAUREN<br>BOOKS</span>`}
-              </div>
-              <div class="home-book-copy">
-                <span class="books-kicker">${escapeHtml(book.genre || 'BOOK')}</span>
-                <h3>${escapeHtml(book.title)}</h3>
-                <p>${escapeHtml(book.author || 'Nexauren')}</p>
-                <strong>${Number(book.price_usd || 0) > 0 ? money(book.price_usd, book.currency) : 'Free'}</strong>
-              </div>
-            </a>
-          </article>
-        `).join('')}
-      </div>
-      <div class="catalog-actions">
-        <a class="book-button primary" href="store/">View all books <span aria-hidden="true">→</span></a>
-      </div>
-    `;
+    host.innerHTML = books.slice(0, 4).map(function (book) {
+      const cover = book.cover_url
+        ? 'style="background-image:url(\'' + encodeURI(book.cover_url) + '\')"'
+        : "";
+      return (
+        '<article class="book-card">' +
+          '<a href="/books/book/?slug=' + encodeURIComponent(book.slug) + '">' +
+            '<div class="book-card-cover ' + (book.cover_url ? "" : "no-cover") + '" ' + cover + '>' +
+              (book.cover_url ? "" : "<span>NEXAUREN<br>STORY</span>") +
+              '<button class="wish-button" type="button" data-book-id="' + escapeHtml(book.id) +
+              '" aria-pressed="false" aria-label="Guardar ' + escapeHtml(book.title) + '">♡</button>' +
+            '</div>' +
+            '<div class="book-card-copy">' +
+              '<div class="book-meta">' + escapeHtml(book.genre || "Livro") + '</div>' +
+              '<h3>' + escapeHtml(book.title) + '</h3>' +
+              '<p>' + escapeHtml(book.author || "Nexauren Story") + '</p>' +
+              '<div class="book-card-bottom">' +
+                '<span class="price">' + money(book.price_usd, book.currency) + '</span>' +
+                '<span class="small-link">Ver livro →</span>' +
+              '</div>' +
+            '</div>' +
+          '</a>' +
+        '</article>'
+      );
+    }).join("");
+
+    bindWishlist();
   }
 
-  async function loadCatalogue() {
+  function bindWishlist() {
+    let saved = [];
     try {
-      const response = await fetch('/api/books', {
-        headers: { Accept: 'application/json' },
+      saved = JSON.parse(localStorage.getItem("nexauren_wishlist") || "[]");
+    } catch (_) {
+      saved = [];
+    }
+    const set = new Set(saved);
+
+    document.querySelectorAll(".wish-button").forEach(function (button) {
+      const id = button.dataset.bookId;
+      if (set.has(id)) {
+        button.classList.add("is-saved");
+        button.setAttribute("aria-pressed", "true");
+        button.textContent = "♥";
+      }
+
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (set.has(id)) {
+          set.delete(id);
+          button.classList.remove("is-saved");
+          button.setAttribute("aria-pressed", "false");
+          button.textContent = "♡";
+        } else {
+          set.add(id);
+          button.classList.add("is-saved");
+          button.setAttribute("aria-pressed", "true");
+          button.textContent = "♥";
+        }
+
+        localStorage.setItem(
+          "nexauren_wishlist",
+          JSON.stringify(Array.from(set))
+        );
       });
-      const text = await response.text();
+    });
+  }
+
+  host.innerHTML =
+    '<div class="empty-state" style="grid-column:1/-1">' +
+    '<div class="empty-icon">Aa</div>' +
+    '<strong>A procurar novos livros…</strong>' +
+    '<p>A carregar o catálogo publicado.</p>' +
+    '</div>';
+
+  fetch("/api/books", { headers: { Accept: "application/json" } })
+    .then(async function (response) {
+      const raw = await response.text();
       let data = {};
       try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        throw new Error('Catalogue returned an invalid response.');
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        throw new Error("Resposta inválida do catálogo.");
       }
-      if (!response.ok) throw new Error(data.error || 'Catalogue unavailable.');
-      renderBooks(data.books || []);
-    } catch (error) {
-      homeCatalog.innerHTML = `
-        <div class="catalog-loading empty-live-catalog">
-          <div class="empty-mark" aria-hidden="true">!</div>
-          <strong>Catalogue unavailable.</strong>
-          <span>${escapeHtml(error.message)}</span>
-          <a class="book-button soft" href="store/">Open Store</a>
-        </div>
-      `;
-    }
-  }
-
-  loadCatalogue();
+      if (!response.ok) {
+        throw new Error(data.error || "Não foi possível carregar o catálogo.");
+      }
+      return data;
+    })
+    .then(function (data) {
+      render(data.books || []);
+    })
+    .catch(function (error) {
+      host.innerHTML =
+        '<div class="empty-state" style="grid-column:1/-1">' +
+        '<div class="empty-icon">!</div>' +
+        '<strong>O catálogo não está disponível.</strong>' +
+        '<p>' + escapeHtml(error.message) + '</p>' +
+        '<a class="book-button soft" href="/books/store/" style="margin-top:15px">Abrir a loja</a>' +
+        '</div>';
+    });
 })();

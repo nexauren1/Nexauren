@@ -1,21 +1,122 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Browse the Nexauren Books digital catalogue by title, author and category.">
-  <title>Store — Nexauren Books</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../books.css">
-  <style>
-    .store-head{padding:70px 0 34px}.store-head h1{font-family:"Playfair Display",serif;font-size:clamp(2.8rem,6vw,4.8rem);letter-spacing:-.045em;line-height:1;margin:0}.store-head p{max-width:620px;color:var(--muted)}.store-tools{display:grid;grid-template-columns:1fr auto;gap:.8rem;margin-top:2rem}.search{min-height:50px;border:1px solid var(--line);border-radius:999px;background:var(--white);padding:0 1rem;font:inherit;color:var(--ink);width:100%}.filter{min-height:50px;border:1px solid var(--line);border-radius:999px;background:var(--white);padding:0 1rem;font:inherit;color:var(--ink)}.catalog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.book-card{overflow:hidden;border:1px solid var(--line);border-radius:24px;background:var(--white);transition:transform .2s ease,box-shadow .2s ease}.book-card:hover{transform:translateY(-3px);box-shadow:0 16px 35px rgba(55,48,40,.08)}.book-card a{color:inherit;text-decoration:none}.book-card-cover{aspect-ratio:3/4;display:grid;place-items:end;padding:18px;background:linear-gradient(145deg,#eee8dd,#c5b8a6);background-size:cover;background-position:center;color:#fff}.book-card-cover span{font:700 1.25rem/1.1 "Playfair Display",serif;text-align:right;letter-spacing:-.03em;text-shadow:0 2px 12px rgba(0,0,0,.14)}.book-card-copy{padding:18px}.book-card-copy h2{margin:6px 0 4px;font:700 1.6rem/1.05 "Playfair Display",serif;letter-spacing:-.03em}.book-card-copy p{margin:0 0 12px;color:var(--muted);font-size:.78rem}.book-card-copy strong{font-size:.85rem}.catalog-empty{padding:5rem 2rem;text-align:center;border:1px dashed #d7cab9;border-radius:28px;background:rgba(255,253,249,.5)}.catalog-empty h2{font-family:"Playfair Display",serif;font-size:2.2rem;margin:.5rem 0}.catalog-empty p{max-width:540px;margin:.5rem auto 0;color:var(--muted)}.store-footer{margin-top:100px}@media(max-width:850px){.catalog-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.store-head{padding-top:48px}.store-tools{grid-template-columns:1fr}.catalog-grid{grid-template-columns:1fr}}
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Loja Nexauren Story: descubra livros por título, autor, género, idioma e preço.">
+  <meta name="theme-color" content="#fbf6ec">
+  <title>Loja de Livros — Nexauren Story</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/books/books.css">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <header class="books-header"><div class="book-shell nav-row"><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><nav class="books-nav" aria-label="Books navigation"><a href="../">Home</a><a class="active" aria-current="page" href="./">Store</a><a href="../#categories">Categories</a><a href="../#how-it-works">About Books</a></nav><a class="books-account" href="../../account/">My account</a></div></header>
-  <main id="main"><section class="book-shell store-head"><p class="books-kicker">NEXAUREN BOOKS · STORE</p><h1>Find your next book.</h1><p>Published titles are loaded directly from the Nexauren Books database.</p><div class="store-tools"><label><span class="sr-only">Search books</span><input class="search" type="search" placeholder="Search titles, authors or categories"></label><label><span class="sr-only">Sort books</span><select class="filter"><option>Featured</option><option>Newest</option><option>Price: low to high</option><option>Price: high to low</option></select></label></div></section><section class="book-shell"><div class="catalog-grid" hidden></div><div class="catalog-empty"><div class="empty-mark" aria-hidden="true" style="margin:0 auto">✦</div><h2>Loading catalogue…</h2><p>Checking the published Books records.</p></div></section></main>
-  <footer class="books-footer store-footer"><div class="book-shell books-footer-grid"><div><a class="books-brand" href="../"><span class="brand-symbol" aria-hidden="true">N</span><span><strong>NEXAUREN</strong><small>BOOKS</small></span></a><p>Focused on books, from discovery to digital delivery.</p></div><div><h3>Books</h3><a href="../">Home</a><a href="./">Store</a><a href="../#categories">Categories</a></div><div><h3>Account</h3><a href="../../account/">My account</a><a href="../../">Nexauren home</a></div><div><h3>Legal</h3><a href="../../legal/privacy.html">Privacy</a><a href="../../legal/terms.html">Terms</a><a href="../../legal/cookies.html">Cookies</a></div></div><div class="book-shell books-footer-bottom"><span>© <span id="year"></span> Nexauren Books</span><span>Live catalogue</span></div></footer>
-  <script>document.getElementById('year').textContent=new Date().getFullYear();</script><script src="./store.js"></script>
+<a class="skip-link" href="#main">Saltar para o conteúdo</a>
+<header class="books-header">
+  <div class="book-shell nav-row">
+    <a class="books-brand" href="/" aria-label="Nexauren Story">
+      <span class="brand-symbol">N</span>
+      <span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span>
+    </a>
+    <button class="books-menu-toggle" type="button" aria-expanded="false" aria-controls="books-nav">
+      <span></span><span></span><span></span><span class="sr-only">Abrir menu</span>
+    </button>
+    <nav id="books-nav" class="books-nav" aria-label="Navegação principal">
+      <a href="/">Livros</a>
+      <a class="active" aria-current="page" href="/books/store/">Loja</a>
+      <a href="/books/categories/">Categorias</a>
+      <a href="/books/library/">Biblioteca</a>
+      <a href="/legal/about.html">Sobre</a>
+    </nav>
+    <div class="header-actions">
+      <form class="header-search" id="global-search" role="search">
+        <label class="sr-only" for="header-search-input">Pesquisar livros</label>
+        <input id="header-search-input" type="search" placeholder="Pesquisar livros">
+        <button type="submit" aria-label="Pesquisar">⌕</button>
+      </form>
+      <a class="books-account" data-account-link href="/account/">Entrar</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-head">
+    <div class="book-shell">
+      <p class="eyebrow">NEXAUREN STORY · LOJA</p>
+      <h1>Encontre a próxima história que quer levar consigo.</h1>
+      <p>Pesquise no catálogo publicado e refine por género, idioma, preço ou ordem de lançamento.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="book-shell">
+      <form id="catalog-filters" class="filter-bar">
+        <div class="control">
+          <label for="search">Pesquisar</label>
+          <input id="search" type="search" placeholder="Título, autor ou género">
+        </div>
+        <div class="control">
+          <label for="genre">Género</label>
+          <select id="genre"><option value="">Todos</option></select>
+        </div>
+        <div class="control">
+          <label for="language">Idioma</label>
+          <select id="language"><option value="">Todos</option></select>
+        </div>
+        <div class="control">
+          <label for="sort">Ordenar</label>
+          <select id="sort">
+            <option value="featured">Em destaque</option>
+            <option value="newest">Mais recentes</option>
+            <option value="price-low">Preço mais baixo</option>
+            <option value="price-high">Preço mais alto</option>
+            <option value="title">Título A–Z</option>
+          </select>
+        </div>
+      </form>
+
+      <div class="catalog-bar">
+        <span id="catalog-count" class="catalog-count">A preparar a estante…</span>
+        <span id="result-note" class="result-note"></span>
+      </div>
+
+      <div id="catalog-grid" class="book-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-icon">Aa</div>
+          <strong>A carregar os livros…</strong>
+          <p>Estamos a consultar o catálogo publicado.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="book-shell news-cta">
+      <div>
+        <h2>Prefere começar por uma estante?</h2>
+        <p>Explore géneros e descubra o catálogo por tipo de leitura.</p>
+      </div>
+      <a class="book-button primary" href="/books/categories/">Ver categorias →</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="book-shell footer-grid">
+    <div>
+      <a class="books-brand" href="/">
+        <span class="brand-symbol">N</span><span><strong>NEXAUREN STORY</strong><small>BOOKS</small></span>
+      </a>
+      <p class="footer-note">Uma livraria digital dedicada a livros, autores e edições digitais.</p>
+    </div>
+    <div><p class="footer-title">Explorar</p><a href="/books/store/">Loja</a><a href="/books/categories/">Categorias</a><a href="/books/library/">Biblioteca</a></div>
+    <div><p class="footer-title">Story</p><a href="/legal/about.html">Sobre</a><a href="/legal/faq.html">FAQ</a><a href="/account/">Minha conta</a></div>
+    <div><p class="footer-title">Informação</p><a href="/legal/privacy.html">Privacidade</a><a href="/legal/terms.html">Termos</a><a href="/legal/cookies.html">Cookies</a></div>
+  </div>
+  <div class="book-shell footer-bottom"><span>© <span id="year"></span> Nexauren Story</span><span>Livros no centro.</span></div>
+</footer>
+<script src="/scripts/site.js"></script>
+<script src="/books/store/store.js"></script>
 </body>
 </html>
