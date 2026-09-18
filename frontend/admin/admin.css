@@ -616,6 +616,154 @@ select:focus, input:focus, textarea:focus {
   grid-template-columns: minmax(280px, .86fr) minmax(0, 1.14fr);
   gap: 12px;
 }
+.bible-detail {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.bible-section {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--paper-2);
+}
+
+.bible-section h3 {
+  margin: 0 0 9px;
+  color: var(--accent-dark);
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.bible-field + .bible-field {
+  margin-top: 8px;
+}
+
+.bible-field span,
+.bible-char > div span {
+  display: block;
+  color: var(--muted);
+  font-size: .57rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.bible-field p,
+.bible-char p,
+.bible-row p {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: .69rem;
+  line-height: 1.55;
+}
+
+.bible-chars {
+  display: grid;
+  gap: 8px;
+}
+
+.bible-char {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.bible-char > strong {
+  font-family: "Playfair Display", serif;
+  font-size: .95rem;
+}
+
+.bible-pill {
+  width: max-content;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: .54rem;
+  font-weight: 800;
+}
+
+.bible-char > div {
+  padding-top: 5px;
+  border-top: 1px solid #ebe6de;
+}
+
+.bible-row {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bible-row + .bible-row {
+  margin-top: 6px;
+}
+
+.bible-row strong {
+  font-size: .67rem;
+}
+
+.file-state {
+  margin-top: 9px;
+  padding: 10px 11px;
+  border-radius: 11px;
+  background: var(--paper-2);
+}
+
+.file-state strong {
+  display: block;
+  font-size: .68rem;
+}
+
+.file-state p {
+  margin: 3px 0 0;
+  font-size: .61rem;
+}
+
+.file-state.success {
+  background: var(--green-soft);
+}
+
+.file-state.success strong {
+  color: var(--green);
+}
+
+.file-state.error {
+  background: var(--red-soft);
+}
+
+.file-state.error strong {
+  color: var(--red);
+}
+
+.file-links .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 37px;
+  color: var(--ink);
+}
+
+.file-links .button-primary {
+  color: #fff;
+}
+
+.plan-row:disabled {
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.plan-row.locked {
+  background: #faf8f4;
+}
+
 .chapter-plan {
   display: grid;
   gap: 6px;
