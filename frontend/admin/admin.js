@@ -52,18 +52,159 @@ function wordCount(value) {
     .length;
 }
 
+const BIBLE_LABELS = {
+  title: 'Título',
+  genre: 'Género',
+  subgenre: 'Subgénero',
+  format: 'Formato',
+  logline: 'Logline',
+  synopsis: 'Sinopse',
+  editorial_scope: 'Escala editorial',
+  scale: 'Escala',
+  character_count_target: 'Personagens definidos pela IA',
+  relation_count_target: 'Relações definidas pela IA',
+  location_count_target: 'Locais definidos pela IA',
+  timeline_milestone_target: 'Marcos da cronologia',
+  plot_thread_target: 'Fios narrativos',
+  premise: 'Premissa',
+  central_conflict: 'Conflito central',
+  protagonist_goal: 'Objectivo do protagonista',
+  stakes: 'Consequências em jogo',
+  themes: 'Temas',
+  beginning: 'Início',
+  inciting_incident: 'Incidente desencadeador',
+  rising_action: 'Escalada',
+  midpoint: 'Ponto médio',
+  crisis: 'Crise',
+  climax: 'Clímax',
+  resolution: 'Resolução',
+  protagonist_arc: 'Arco do protagonista',
+  ending: 'Final',
+  setting: 'Cenário',
+  time: 'Época',
+  culture: 'Contexto cultural',
+  technology: 'Tecnologia',
+  speculative_element: 'Elemento especulativo',
+  phenomenon: 'Fenómeno',
+  rules: 'Regras do mundo',
+  limitations: 'Limitações',
+  key_locations: 'Locais principais',
+  locations: 'Locais',
+  institutions: 'Instituições',
+  social_context: 'Contexto social',
+  important_objects_or_systems: 'Objectos ou sistemas importantes',
+  pov: 'Ponto de vista',
+  tense: 'Tempo verbal',
+  voice: 'Voz narrativa',
+  tone: 'Tom',
+  pacing: 'Ritmo',
+  dialogue_guidance: 'Orientação dos diálogos',
+  description_guidance: 'Orientação das descrições',
+  scene_rules: 'Regras de cena',
+  immutable_facts: 'Factos imutáveis',
+  names_and_terms: 'Nomes e termos canónicos',
+  must_not_change: 'Não pode mudar',
+  knowledge_boundaries: 'Limites de conhecimento',
+  forbidden_elements: 'Elementos proibidos',
+  unresolved_threads: 'Fios por resolver',
+  reveal_rules: 'Regras de revelação',
+  future_threads: 'Fios futuros',
+  series_threads: 'Fios da série',
+  this_book_ending: 'Final deste livro',
+  roles: 'Funções',
+  identity: 'Identidade',
+  background: 'Passado',
+  wants: 'Quer',
+  needs: 'Precisa',
+  fears: 'Medos',
+  flaws: 'Falhas',
+  strengths: 'Forças',
+  arc: 'Arco',
+  relationships: 'Relações',
+  knowledge_boundaries: 'O que sabe / não sabe',
+  secrets: 'Segredos',
+  id: 'ID canónico',
+  order: 'Ordem',
+  phase: 'Fase',
+  event: 'Acontecimento',
+  cause: 'Causa',
+  consequence: 'Consequência',
+  reveals: 'Revelação',
+  from_character_id: 'De',
+  to_character_id: 'Para',
+  from: 'De',
+  to: 'Para',
+  type: 'Tipo',
+  dynamic: 'Dinâmica',
+  evolution: 'Evolução',
+  included: 'Incluído',
+  content: 'Conteúdo',
+};
+
+function humanizeBibleKey(key) {
+  const clean = String(key || '').trim();
+  if (BIBLE_LABELS[clean]) return BIBLE_LABELS[clean];
+  return clean
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function bibleValue(value) {
   if (value === undefined || value === null) return '';
-  if (Array.isArray(value)) return value.map(bibleValue).join(' · ');
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => bibleValue(item)).filter(Boolean).join(' · ');
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, item]) => `${humanizeBibleKey(key)}: ${bibleValue(item)}`)
+      .filter(Boolean)
+      .join(' · ');
+  }
   return String(value).trim();
 }
 
-function renderBibleDetail(bible) {
-  if (!bible) {
-    return '<p class="reader-empty">A Bíblia ainda não foi criada.</p>';
+function renderBibleObject(value) {
+  if (!value || typeof value !== 'object') return escapeHtml(bibleValue(value));
+  if (Array.isArray(value)) {
+    return '<div class="bible-list">' + value.map((item, index) =>
+      '<div class="bible-row"><strong>' + (index + 1) + '</strong><p>'
+      + escapeHtml(bibleValue(item)) + '</p></div>',
+    ).join('') + '</div>';
   }
+  return Object.entries(value)
+    .filter(([, item]) => bibleValue(item))
+    .map(([key, item]) => {
+      const nested = item && typeof item === 'object';
+      return '<div class="bible-field">' +
+        '<span>' + escapeHtml(humanizeBibleKey(key)) + '</span>' +
+        (nested
+          ? renderBibleObject(item)
+          : '<p>' + escapeHtml(bibleValue(item)) + '</p>') +
+        '</div>';
+    }).join('');
+}
 
+function renderBibleScope(scope) {
+  if (!scope || typeof scope !== 'object') return '';
+  const values = [
+    ['Escala', scope.scale],
+    ['Personagens', scope.character_count_target],
+    ['Relações', scope.relation_count_target],
+    ['Locais', scope.location_count_target],
+    ['Marcos', scope.timeline_milestone_target],
+    ['Fios narrativos', scope.plot_thread_target],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+  if (!values.length) return '';
+  return '<section class="bible-section bible-scope"><h3>Escala decidida pela IA</h3>' +
+    '<div class="bible-scope-grid">' +
+    values.map(([label, value]) =>
+      '<div class="bible-scope-card"><strong>' + escapeHtml(value) +
+      '</strong><span>' + escapeHtml(label) + '</span></div>',
+    ).join('') + '</div></section>';
+}
+
+function renderBibleDetail(bible) {
+  if (!bible) return '<p class="reader-empty">A Bíblia ainda não foi criada.</p>';
   const groups = [
     ['Identidade', bible.identity],
     ['História', bible.story],
@@ -72,57 +213,64 @@ function renderBibleDetail(bible) {
     ['Continuidade', bible.continuity],
     ['Continuação', bible.continuation],
   ];
-
   const body = groups.map(([title, value]) => {
     if (!value || typeof value !== 'object') return '';
-    const rows = Object.entries(value)
-      .filter((entry) => bibleValue(entry[1]))
-      .slice(0, 16)
-      .map(([key, item]) =>
-        '<div class="bible-field"><span>' +
-        escapeHtml(key.replace(/_/g, ' ')) +
-        '</span><p>' +
-        escapeHtml(bibleValue(item)) +
-        '</p></div>',
-      )
-      .join('');
-
-    return rows
-      ? '<section class="bible-section"><h3>' +
-        escapeHtml(title) +
-        '</h3>' + rows + '</section>'
-      : '';
+    const html = renderBibleObject(value);
+    return html ? '<section class="bible-section"><h3>' + escapeHtml(title) + '</h3>' + html + '</section>' : '';
   }).join('');
 
-  const characters = Array.isArray(bible.characters)
-    ? bible.characters
-    : [];
+  const characters = Array.isArray(bible.characters) ? bible.characters : [];
+  const cast = characters.map((item, index) => {
+    const name = item?.name || item?.canonical_name || 'Sem nome definido';
+    const fields = renderBibleObject({
+      identity: item?.identity,
+      background: item?.background,
+      wants: item?.wants,
+      needs: item?.needs,
+      fears: item?.fears,
+      flaws: item?.flaws,
+      strengths: item?.strengths,
+      arc: item?.arc,
+      relationships: item?.relationships,
+      knowledge_boundaries: item?.knowledge_boundaries,
+      secrets: item?.secrets,
+    });
+    return '<article class="bible-char bible-char-detail"><div class="bible-char-head">'
+      + '<strong>' + escapeHtml(name) + '</strong>'
+      + (item?.role ? '<span class="bible-pill">' + escapeHtml(item.role) + '</span>' : '')
+      + '</div><small>Personagem ' + (index + 1) + '</small>'
+      + fields + '</article>';
+  }).join('');
 
-  const cast = characters.map((item, index) =>
-    '<article class="bible-char"><strong>' +
-    escapeHtml(
-      item?.name ||
-      item?.canonical_name ||
-      ('Personagem ' + (index + 1)),
-    ) +
-    '</strong><p>' +
-    escapeHtml(
-      bibleValue(item?.role) ||
-      bibleValue(item?.arc) ||
-      bibleValue(item?.wants),
-    ) +
-    '</p></article>',
+  const relations = Array.isArray(bible.relations) ? bible.relations : [];
+  const relationHtml = relations.map((item) =>
+    '<div class="bible-row"><strong>'
+    + escapeHtml(item?.from_character_id || item?.from || '—')
+    + ' → ' + escapeHtml(item?.to_character_id || item?.to || '—')
+    + '</strong><p>' + escapeHtml(
+      bibleValue(item?.type || item?.dynamic || item?.evolution || item),
+    ) + '</p></div>',
+  ).join('');
+
+  const timeline = Array.isArray(bible.timeline) ? bible.timeline : [];
+  const timelineHtml = timeline.map((item, index) =>
+    '<div class="bible-row"><strong>Marco ' + escapeHtml(item?.order || index + 1) +
+    (item?.phase ? ' · ' + escapeHtml(item.phase) : '') + '</strong><p>' +
+    escapeHtml(bibleValue(item?.event)) + '</p><p><b>Causa:</b> ' +
+    escapeHtml(bibleValue(item?.cause)) + '</p><p><b>Consequência:</b> ' +
+    escapeHtml(bibleValue(item?.consequence)) + '</p>' +
+    (item?.reveals ? '<p><b>Revelação:</b> ' + escapeHtml(bibleValue(item.reveals)) + '</p>' : '') +
+    '</div>',
   ).join('');
 
   return '<div class="bible-detail">' +
+    renderBibleScope(bible.identity?.editorial_scope) +
     body +
-    (cast
-      ? '<section class="bible-section"><h3>Personagens</h3>' +
-        cast + '</section>'
-      : '') +
+    (cast ? '<section class="bible-section"><h3>Personagens (' + characters.length + ')</h3>' + cast + '</section>' : '') +
+    (relationHtml ? '<section class="bible-section"><h3>Relações (' + relations.length + ')</h3>' + relationHtml + '</section>' : '') +
+    (timelineHtml ? '<section class="bible-section"><h3>Cronologia (' + timeline.length + ')</h3>' + timelineHtml + '</section>' : '') +
     '</div>';
 }
-
 function setGlobal(message, kind = '') {
   const node = $('global-status');
   if (!node) return;
