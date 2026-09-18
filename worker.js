@@ -1427,15 +1427,36 @@ async function adminApi(request, env) {
               AND length(trim(content)) > 0`,
         ).bind(bookId).first();
 
+        const plannedCount = await env.BOOKS_DB.prepare(
+          `SELECT chapters_json
+             FROM story_bibles
+            WHERE book_id = ?
+            LIMIT 1`,
+        ).bind(bookId).first();
+
+        const planned = safeJsonParse(
+          plannedCount?.chapters_json,
+          {},
+        );
+        const plannedChapters = Array.isArray(planned?.chapters)
+          ? planned.chapters.length
+          : Array.isArray(planned) ? planned.length : 0;
+
         if (!Number(bible?.canon_locked)) {
           return json({
             error: 'A Bíblia Oficial precisa estar aprovada antes da publicação.',
           }, 400);
         }
 
-        if (Number(chapterCount?.total || 0) < 1) {
+        if (!plannedChapters) {
           return json({
-            error: 'Escreve pelo menos um capítulo antes de publicar.',
+            error: 'Cria primeiro a estrutura completa do livro.',
+          }, 400);
+        }
+
+        if (Number(chapterCount?.total || 0) < plannedChapters) {
+          return json({
+            error: `O livro ainda não está completo. Escreve os ${plannedChapters} capítulos planeados antes de publicar.`,
           }, 400);
         }
       }
