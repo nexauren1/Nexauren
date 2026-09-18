@@ -444,17 +444,21 @@ const OUTLINE_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         required: [
-          'number', 'title', 'objective', 'characters',
-          'location', 'conflict', 'result',
+          'number', 'title', 'arc_role', 'objective', 'characters',
+          'location', 'conflict', 'turning_point', 'result',
+          'cause_forward',
         ],
         properties: {
           number: { type: 'integer' },
           title: { type: 'string' },
+          arc_role: { type: 'string' },
           objective: { type: 'string' },
           characters: { type: 'array', items: { type: 'string' } },
           location: { type: 'string' },
           conflict: { type: 'string' },
+          turning_point: { type: 'string' },
           result: { type: 'string' },
+          cause_forward: { type: 'string' },
         },
       },
     },
@@ -627,6 +631,81 @@ function parseAIJsonResponse(result) {
   );
 }
 
+
+function parseChapterSize(value) {
+  const text = String(value || '')
+    .replace(/\u00a0/g, ' ')
+    .trim();
+  const match = text.match(/(\\d[\\d\\s.,]*)\\s*[\\-–—]\\s*(\\d[\\d\\s.,]*)/);
+  if (!match) {
+    return { min: 800, max: 1200, target: 1000 };
+  }
+
+  const parseNumber = (part) => Number(
+    String(part).replace(/[^0-9]/g, ''),
+  ) || 0;
+
+  const first = parseNumber(match[1]);
+  const second = parseNumber(match[2]);
+  if (!first || !second || second < first) {
+    return { min: 800, max: 1200, target: 1000 };
+  }
+
+  return {
+    min: first,
+    max: second,
+    target: Math.round((first + second) / 2),
+  };
+}
+
+function countWords(value) {
+  return String(value || '')
+    .trim()
+    .split(/\\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+function chapterManuscriptIssues(contentValue, range) {
+  const content = String(contentValue || '').trim();
+  const words = countWords(content);
+  const paragraphs = content
+    .split(/\\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const minimumAcceptable = Math.max(
+    120,
+    Math.floor(range.min * 0.9),
+  );
+  const maximumAcceptable = Math.ceil(range.max * 1.05);
+  const lower = content.toLowerCase();
+  const issues = [];
+
+  if (words < minimumAcceptable) {
+    issues.push(
+      `demasiado curto: ${words} palavras, alvo ${range.min}-${range.max}`,
+    );
+  }
+
+  if (words > maximumAcceptable) {
+    issues.push(
+      `demasiado longo: ${words} palavras, alvo ${range.min}-${range.max}`,
+    );
+  }
+
+  if (paragraphs.length < 4 && words >= 500) {
+    issues.push('tem poucas cenas/parágrafos para um capítulo completo');
+  }
+
+  if (
+    /resumo do capitulo|resumo deste capitulo|este capitulo conta|esta parte da historia|ao longo da jornada/i.test(lower)
+  ) {
+    issues.push('parece um resumo da história em vez de uma cena narrativa');
+  }
+
+  return { words, paragraphs: paragraphs.length, issues };
+}
+
 function validateAIResponse(action, response) {
   if (!response || typeof response !== 'object') {
     throw new Error('A resposta da IA está vazia ou malformada.');
@@ -752,7 +831,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
               type: 'json_object',
             },
         max_tokens: maxTokens,
-        temperature: 0.1,
+        temperature: action === 'chapter' ? 0.55 : 0.15,
       },
     );
 
@@ -773,10 +852,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         [user, compactRule].join('\\n\\n'),
         true,
         action === 'chapter'
-          ? 8000
+          ? 9000
           : action === 'story_bible'
-            ? 5000
-            : 4500,
+            ? 6500
+            : 5000,
       );
       response = validateAIResponse(
         action,
@@ -803,10 +882,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       ].join('\\n');
 
       const retryTokens = action === 'chapter'
-        ? 8000
+        ? 9000
         : action === 'story_bible'
-          ? 5000
-          : 4500;
+          ? 6500
+          : 5000;
 
       try {
         result = await aiRequest(
@@ -837,10 +916,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       ].join('\\n');
 
       const finalTokens = action === 'chapter'
-        ? 7000
+        ? 8500
         : action === 'story_bible'
-          ? 4500
-          : 4000;
+          ? 6000
+          : 4500;
 
       try {
         result = await aiRequest(
@@ -970,7 +1049,16 @@ async function saveOutline(env, bookId, outline) {
   ).bind(JSON.stringify(structure), now(), bookId).run();
 }
 
-async function saveChapter(env, bookId, chapterNumber, chapter, adminId, instructions) {
+async function saveChapter(
+  env,
+  bookId,
+  chapterNumber,
+  chapter,
+  adminId,
+  instructions,
+  wordCount = countWords(chapter?.content),
+  range = parseChapterSize('800-1200'),
+) {
   const latest = await env.BOOKS_DB.prepare(
     `SELECT COALESCE(MAX(version_number), 0) AS version
        FROM chapter_versions
@@ -996,6 +1084,8 @@ async function saveChapter(env, bookId, chapterNumber, chapter, adminId, instruc
     chapter.content,
     JSON.stringify({
       chapter_number: chapterNumber,
+      word_count: wordCount,
+      target_range: `${range.min}-${range.max}`,
       instructions: instructions || '',
     }),
     now(),
@@ -1119,7 +1209,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Official Story Bible Architect. Create the official creative canon from the author inputs only. The Story Bible becomes the single source of truth for the future book. Never write chapters. Preserve the title, idea, genre, series requirements and chapter-size requirements. Use stable IDs. For narrative fiction, create only the essential cast: maximum 8 characters, maximum 12 relations and maximum 10 timeline milestones. Keep every text field short, usually 1 to 2 sentences. Never return empty core arrays merely to satisfy the schema. Return only JSON matching the schema.',
+      'You are the NexaurenBooks Official Story Bible Architect. Create the definitive creative canon from the author inputs only. Never write chapter prose. The Bible must be detailed enough that another writer can write the entire book without inventing canon. Preserve the exact title, premise, genre, series requirements and chapter-size requirements. Build: identity with title, genre, subgenre, logline, synopsis and format; story with central conflict, stakes, themes, beginning, inciting incident, midpoint, climax, resolution and protagonist arc; characters with stable ids, role, identity, wants, needs, flaw, arc, relationships and knowledge boundaries; relations; world with setting, time, culture, rules and limitations; timeline in causal order; style with POV, tense, voice, tone, pacing and dialogue guidance; continuity with immutable facts, must-not-change rules and unresolved threads; continuation with this book\'s ending plus future-safe series threads. Never invent a named place, person, object or rule that is not supported by the author premise or by another element of the Bible you are defining. Keep core fields concise, but complete. Maximum 8 characters, 12 relations and 12 timeline milestones. Return only JSON matching the schema.',
       `${base}\n\nBook requirements:\n- Genre: ${context.genre || 'Not specified'}\n- Series name: ${context.series_name || 'Standalone'}\n- Series size: ${context.series_size || 'Not specified'}\n- Chapter size: ${context.chapter_size || context.desired_size || 'Not specified'}\n\nCreate the Official Story Bible now.`,
       STORY_BIBLE_SCHEMA,
       admin.user_id,
@@ -1162,7 +1252,7 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Editorial Structure Planner. Create only the editorial skeleton. Use European Portuguese. Keep every text field very short. The system will generate full chapter content later. Return valid JSON only. Plan a normal book of 12 chapters unless the story clearly needs another count, with a hard maximum of 16 chapters. Include only relevant front/back matter. For each chapter return a short title, objective, character names, location, conflict and result. Keep each field to one short sentence. Never write prose paragraphs.',
+      'You are the NexaurenBooks Editorial Structure Planner. Create the complete chapter map for this one book from the locked Story Bible. Use European Portuguese. Structure must follow causality: an event creates a consequence, which creates the next problem. Start with setup and inciting incident, build escalating complications and a meaningful midpoint, drive toward a climax, then resolve the central conflict and protagonist arc. For each chapter provide: arc_role, a concrete objective, only canon characters, canon location, concrete conflict, turning point, result, and cause_forward explaining what this chapter causes next. Titles must describe a specific story event rather than generic labels such as "A Verdade", "A Batalha" or "O Futuro". Do not introduce characters, locations, objects, powers, facts or relationships absent from the locked Bible. The final chapter must actually conclude this book unless the Bible explicitly says it is a continuation. Plan 12 chapters by default, maximum 16, unless the story clearly needs another count. Include only useful front/back matter. Keep each field to one short sentence. Never write chapter prose. Return only JSON matching the schema.',
       `Book:\n${clip(base, 10000)}\n\nStory Bible:\n${clip(context.story_bible, 18000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 'AI may choose based on the story'}. Target chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}. Series size: ${context.book_metadata?.creation?.series_size || 'not specified'}. Create a concise editorial skeleton now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
@@ -1208,17 +1298,113 @@ async function adminAI(request, env, admin) {
     const requestedTitle = String(
       body?.title || requestedOutline.title || `Capítulo ${chapterNumber}`,
     ).trim();
-    const chapter = await runAIJson(
-      env,
-      action,
-      bookId,
-      `You are the NexaurenBooks Writer. Write exactly one chapter in ${language}. The chapter title is fixed by the approved structure and must not be changed. The Story Bible, locked canonical facts and current Story State are authoritative. Follow the approved chapter plan. Do not change names, ages, relationships, world rules, chronology or knowledge states. Do not add a different chapter number. Return only JSON matching the schema. The content field must contain the chapter prose only; do not repeat the title inside content.`,
-      `Language: ${language}\n\nFixed chapter number: ${chapterNumber}\nFixed chapter title: ${requestedTitle}\nTarget chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}\n\nStory Bible:\n${clip(context.story_bible, 16000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 6000)}\n\nStory State:\n${clip(context.story_state || {}, 6000)}\n\nRelevant previous chapters:\n${clip(previous, 8000)}\n\nApproved chapter plan:\n${clip(requestedOutline, 6000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 5000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber} now.`,
-      CHAPTER_SCHEMA,
-      admin.user_id,
+    if (chapterNumber > 1) {
+      const previousNumber = chapterNumber - 1;
+      const previousWritten = context.chapters.some(
+        (item) => Number(item.chapter_number) === previousNumber
+          && Number(item.is_current) === 1
+          && String(item.content || '').trim(),
+      );
+
+      if (!previousWritten) {
+        return json({
+          error: `Escreve primeiro o capítulo ${previousNumber}. A escrita é sequencial para proteger a continuidade da história.`,
+        }, 409);
+      }
+    }
+
+    const range = parseChapterSize(
+      context.book_metadata?.creation?.chapter_size
+        || context.chapter_size
+        || context.desired_size,
     );
-    chapter.title = requestedTitle;
-    chapter.summary = String(chapter.summary || '').trim();
+
+    const chapterSystem = `You are the NexaurenBooks Writer. Write exactly one finished book chapter in ${language}. The approved chapter title is fixed and must not change. The locked Story Bible is the highest authority, followed by locked canonical facts, current Story State, approved chapter plan and relevant previous chapters. Never invent canon. Never introduce a new named person, named location, object, rule, relationship, age, backstory or knowledge state unless it already exists in the authoritative context.
+
+Write MANUSCRIPT PROSE, not a synopsis or summary. Start inside a concrete scene. Dramatize the events: show actions, setting, sensory detail, decisions, consequences and character reactions. Use natural dialogue when the scene benefits from it. Let scenes unfold instead of saying that characters "faced challenges", "discovered secrets" or "went on a journey". Avoid exposition dumps, generic reflections, chapter-summary language, meta-commentary and writing-process language. Every scene must change the situation or deepen a character conflict. End on the approved result or a concrete hook that leads to the next chapter. The content field must contain prose only; do not repeat the title inside content. Return only JSON matching the schema.`;
+
+    const chapterUser = `Language: ${language}
+
+Fixed chapter number: ${chapterNumber}
+Fixed chapter title: ${requestedTitle}
+Required chapter size: ${range.min}-${range.max} words
+Target: approximately ${range.target} words
+
+QUALITY GATE:
+- Produce a real chapter, not a summary.
+- Stay within the requested word range.
+- Use multiple paragraphs and concrete scenes.
+- Do not skip major events with phrases such as "dias depois" unless the approved plan requires a time jump.
+- Never add "Lisboa", another city, a new country or another named place unless it is explicitly present in the Story Bible.
+- Never add characters outside the approved cast.
+- Do not end with a generic moral or summary unless the plan explicitly requires it.
+
+Story Bible:
+${clip(context.story_bible, 18000)}
+
+Canonical facts:
+${clip(context.canonical_facts, 6000)}
+
+Story State:
+${clip(context.story_state || {}, 6000)}
+
+Relevant previous chapters:
+${clip(previous, 9000)}
+
+Approved chapter plan:
+${clip(requestedOutline, 7000)}
+
+Existing current version (regeneration target):
+${clip(currentChapter || {}, 5000)}
+
+Admin instructions:
+${instructions}
+
+Generate chapter ${chapterNumber} now.`;
+
+    let chapter;
+    let manuscriptCheck;
+    let lastIssues = [];
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const regeneration = attempt === 1
+        ? ''
+        : `
+
+REGENERATION REQUIRED:
+The previous draft failed the manuscript quality gate:
+- ${lastIssues.join('; ')}
+Write the entire chapter again from the beginning. Do not shorten it into a summary. Stay inside the requested range.
+`;
+
+      chapter = await runAIJson(
+        env,
+        action,
+        bookId,
+        chapterSystem + regeneration,
+        chapterUser,
+        CHAPTER_SCHEMA,
+        admin.user_id,
+      );
+
+      chapter.title = requestedTitle;
+      chapter.summary = String(chapter.summary || '').trim();
+      manuscriptCheck = chapterManuscriptIssues(
+        chapter.content,
+        range,
+      );
+
+      if (!manuscriptCheck.issues.length) break;
+      lastIssues = manuscriptCheck.issues;
+      chapter = null;
+    }
+
+    if (!chapter || !manuscriptCheck?.words) {
+      return json({
+        error: `A IA não conseguiu produzir um capítulo completo dentro do tamanho definido (${range.min}-${range.max} palavras). Tenta novamente.`,
+      }, 502);
+    }
+
     const saved = await saveChapter(
       env,
       bookId,
@@ -1226,8 +1412,18 @@ async function adminAI(request, env, admin) {
       chapter,
       admin.user_id,
       instructions,
+      manuscriptCheck.words,
+      range,
     );
-    return json({ ok: true, action, chapter, version: saved.version });
+
+    return json({
+      ok: true,
+      action,
+      chapter,
+      word_count: manuscriptCheck.words,
+      target_range: `${range.min}-${range.max}`,
+      version: saved.version,
+    });
   }
 
   if (action === 'story_state') {
@@ -1387,6 +1583,76 @@ async function adminAI(request, env, admin) {
   }
 
   return json({ error: 'Unknown AI action.' }, 400);
+}
+
+
+function inspectBookCompletion(context) {
+  const structure = context?.story_bible?.outline;
+  const plannedChapters = Array.isArray(structure?.chapters)
+    ? structure.chapters
+    : Array.isArray(structure) ? structure : [];
+
+  const currentChapters = (context?.chapters || [])
+    .filter((item) => Number(item.is_current) === 1)
+    .sort((a, b) => Number(a.chapter_number) - Number(b.chapter_number));
+
+  const range = parseChapterSize(
+    context?.book_metadata?.creation?.chapter_size
+      || context?.chapter_size
+      || context?.desired_size,
+  );
+
+  const byNumber = new Map(
+    currentChapters.map((item) => [
+      Number(item.chapter_number),
+      item,
+    ]),
+  );
+
+  const missingChapters = [];
+  const invalidChapters = [];
+  let wordCount = 0;
+
+  for (const planned of plannedChapters) {
+    const number = Number(planned?.number);
+    const chapter = byNumber.get(number);
+
+    if (!chapter || !String(chapter.content || '').trim()) {
+      missingChapters.push(number);
+      continue;
+    }
+
+    const words = countWords(chapter.content);
+    wordCount += words;
+
+    const minimumAcceptable = Math.max(
+      120,
+      Math.floor(range.min * 0.9),
+    );
+    const maximumAcceptable = Math.ceil(range.max * 1.05);
+
+    if (
+      words < minimumAcceptable
+      || words > maximumAcceptable
+    ) {
+      invalidChapters.push(number);
+    }
+  }
+
+  return {
+    plannedCount: plannedChapters.length,
+    writtenCount: currentChapters.length,
+    wordCount,
+    targetRange: `${range.min}-${range.max}`,
+    missingChapters,
+    invalidChapters,
+    complete: Boolean(
+      context?.story_bible?.canon_locked
+      && plannedChapters.length
+      && !missingChapters.length
+      && !invalidChapters.length
+    ),
+  };
 }
 
 async function adminApi(request, env) {
@@ -1596,28 +1862,13 @@ async function adminApi(request, env) {
             LIMIT 1`,
         ).bind(bookId).first();
 
-        const chapterCount = await env.BOOKS_DB.prepare(
-          `SELECT COUNT(*) AS total
-             FROM chapter_versions
-            WHERE book_id = ?
-              AND is_current = 1
-              AND length(trim(content)) > 0`,
-        ).bind(bookId).first();
-
-        const plannedCount = await env.BOOKS_DB.prepare(
-          `SELECT chapters_json
-             FROM story_bibles
-            WHERE book_id = ?
-            LIMIT 1`,
-        ).bind(bookId).first();
-
-        const planned = safeJsonParse(
-          plannedCount?.chapters_json,
-          {},
+        const completionContext = await getBookContext(
+          env,
+          bookId,
         );
-        const plannedChapters = Array.isArray(planned?.chapters)
-          ? planned.chapters.length
-          : Array.isArray(planned) ? planned.length : 0;
+        const completion = inspectBookCompletion(
+          completionContext || book,
+        );
 
         if (!Number(bible?.canon_locked)) {
           return json({
@@ -1625,15 +1876,22 @@ async function adminApi(request, env) {
           }, 400);
         }
 
-        if (!plannedChapters) {
+        if (!completion.plannedCount) {
           return json({
             error: 'Cria primeiro a estrutura completa do livro.',
           }, 400);
         }
 
-        if (Number(chapterCount?.total || 0) < plannedChapters) {
+        if (!completion.complete) {
+          const missing = completion.missingChapters.length
+            ? ` capítulos em falta: ${completion.missingChapters.join(', ')}.`
+            : '';
+          const invalid = completion.invalidChapters.length
+            ? ` capítulos fora do tamanho definido: ${completion.invalidChapters.join(', ')}.`
+            : '';
+
           return json({
-            error: `O livro ainda não está completo. Escreve os ${plannedChapters} capítulos planeados antes de publicar.`,
+            error: `O livro ainda não está pronto para publicação.${missing || invalid || ' Completa todos os capítulos e valida o manuscrito.'}`,
           }, 400);
         }
       }
@@ -1872,12 +2130,77 @@ async function adminApi(request, env) {
   if (path === '/api/admin/files' && method === 'GET') {
     const bookId = url.searchParams.get('book_id');
     if (!bookId) return json({ error: 'book_id is required.' }, 400);
-    const chapters = await getBookChapters(env, bookId);
+
+    const context = await getBookContext(env, bookId);
+    if (!context) return json({ error: 'Book not found.' }, 404);
+
+    const completion = inspectBookCompletion(context);
+
     return json({
       generated_on_demand: true,
       formats: ['pdf', 'epub'],
-      chapters: chapters.filter((item) => Number(item.is_current) === 1).length,
-      note: 'Files are generated from the approved text when requested; no external object storage is required.',
+      chapters: completion.writtenCount,
+      planned_chapters: completion.plannedCount,
+      word_count: completion.wordCount,
+      target_range: completion.targetRange,
+      complete: completion.complete,
+      can_generate_pdf: completion.complete,
+      missing_chapters: completion.missingChapters,
+      invalid_chapters: completion.invalidChapters,
+      note: completion.complete
+        ? 'O PDF está pronto para ser gerado a partir do manuscrito aprovado.'
+        : 'Completa e valida todos os capítulos antes de gerar o PDF final.',
+    });
+  }
+
+  if (
+    path === '/api/admin/files/download'
+    && method === 'GET'
+  ) {
+    const bookId = url.searchParams.get('book_id');
+    const format = String(
+      url.searchParams.get('format') || 'pdf',
+    ).toLowerCase();
+
+    if (!bookId) return json({ error: 'book_id is required.' }, 400);
+    if (format !== 'pdf') {
+      return json({
+        error: 'Este botão gera actualmente apenas o PDF.',
+      }, 400);
+    }
+
+    const context = await getBookContext(env, bookId);
+    if (!context) return json({ error: 'Book not found.' }, 404);
+
+    const completion = inspectBookCompletion(context);
+    if (!completion.complete) {
+      return json({
+        error: 'O livro ainda não está completo. Escreve e valida todos os capítulos antes de gerar o PDF.',
+      }, 409);
+    }
+
+    const chapters = context.chapters
+      .filter((item) => Number(item.is_current) === 1)
+      .sort((a, b) => Number(a.chapter_number) - Number(b.chapter_number));
+
+    const structure = context.story_bible?.outline || null;
+    const filename = `${slugify(context.title) || 'nexauren-book'}.pdf`;
+    const bytes = buildPdf(
+      context.title,
+      context.author || 'Nexauren',
+      chapters,
+      structure,
+      context.subtitle || '',
+      context.language || 'pt-PT',
+    );
+
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        'content-type': 'application/pdf',
+        'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'cache-control': 'private, no-store',
+      },
     });
   }
 
@@ -2044,138 +2367,421 @@ function xmlEscape(value) {
     .replace(/'/g, '&apos;');
 }
 
-function textEscapePdf(value) {
-  return String(value ?? '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7E]/g, '')
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
+function winAnsiBytes(value) {
+  const special = {
+    '€': 0x80,
+    '‚': 0x82,
+    'ƒ': 0x83,
+    '„': 0x84,
+    '…': 0x85,
+    '†': 0x86,
+    '‡': 0x87,
+    'ˆ': 0x88,
+    '‰': 0x89,
+    'Š': 0x8a,
+    '‹': 0x8b,
+    'Œ': 0x8c,
+    'Ž': 0x8e,
+    '‘': 0x91,
+    '’': 0x92,
+    '“': 0x93,
+    '”': 0x94,
+    '•': 0x95,
+    '–': 0x96,
+    '—': 0x97,
+    '˜': 0x98,
+    '™': 0x99,
+    'š': 0x9a,
+    '›': 0x9b,
+    'œ': 0x9c,
+    'ž': 0x9e,
+    'Ÿ': 0x9f,
+  };
+
+  const output = [];
+  for (const char of String(value ?? '')) {
+    const code = char.codePointAt(0);
+    if (code <= 0xff) {
+      output.push(code);
+    } else if (special[char] != null) {
+      output.push(special[char]);
+    } else {
+      output.push(0x3f);
+    }
+  }
+  return new Uint8Array(output);
 }
 
-function wrapText(value, max = 88) {
-  const words = String(value || '').replace(/\r/g, '').split(/\s+/).filter(Boolean);
+function pdfLiteralBytes(value) {
+  const source = winAnsiBytes(value);
+  const output = [];
+
+  for (const byte of source) {
+    if (
+      byte === 0x28
+      || byte === 0x29
+      || byte === 0x5c
+    ) {
+      output.push(0x5c);
+    }
+
+    output.push(byte);
+  }
+
+  return new Uint8Array(output);
+}
+
+function asciiBytes(value) {
+  return new TextEncoder().encode(String(value || ''));
+}
+
+function wrapPdfText(value, maxChars) {
+  const text = String(value ?? '')
+    .replace(/\r/g, '')
+    .trim();
+
+  if (!text) return [''];
+
+  const words = text.split(/\s+/).filter(Boolean);
   const lines = [];
   let current = '';
+
   for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > max && current) {
+    const next = current
+      ? `${current} ${word}`
+      : word;
+
+    if (next.length > maxChars && current) {
       lines.push(current);
       current = word;
     } else {
       current = next;
     }
   }
+
   if (current) lines.push(current);
   return lines;
 }
 
-function buildPdf(title, author, chapters, structure = null) {
+function buildPdf(
+  title,
+  author,
+  chapters,
+  structure = null,
+  subtitle = '',
+  language = 'pt-PT',
+) {
+  const pageWidth = 432;
+  const pageHeight = 648;
+  const marginX = 48;
+  const topY = 575;
+  const bottomY = 48;
+  const leading = 14;
+  const maxBodyLines = 36;
   const pages = [];
-  let pageLines = [title, `Por ${author}`, ''];
+
   const normalized = structure && typeof structure === 'object'
-    ? structure : {};
+    ? structure
+    : {};
+
   const frontMatter = Array.isArray(normalized.front_matter)
-    ? normalized.front_matter.filter((item) => item?.included !== false)
+    ? normalized.front_matter.filter(
+        (item) => item?.included !== false
+          && String(item?.content || '').trim(),
+      )
     : [];
+
   const backMatter = Array.isArray(normalized.back_matter)
-    ? normalized.back_matter.filter((item) => item?.included !== false)
+    ? normalized.back_matter.filter(
+        (item) => item?.included !== false
+          && String(item?.content || '').trim(),
+      )
     : [];
-  const flush = () => {
-    if (pageLines.length) pages.push([...pageLines]);
-    pageLines = [];
+
+  const addPage = (kind = 'body') => {
+    const page = { kind, lines: [] };
+    pages.push(page);
+    return page;
   };
-  const addSection = (heading, content = '') => {
-    for (const line of ['', heading, '', ...wrapText(content, 92), '']) {
-      if (pageLines.length >= 47) flush();
-      pageLines.push(line);
+
+  const addLines = (page, lines) => {
+    for (const line of lines) {
+      page.lines.push(line);
     }
   };
 
+  const addParagraphsToPages = (paragraphs) => {
+    let page = pages.at(-1) || addPage();
+
+    for (const paragraph of paragraphs) {
+      const lines = wrapPdfText(paragraph, 56);
+
+      if (page.lines.length && page.lines.length + lines.length + 1 > maxBodyLines) {
+        page = addPage();
+      }
+
+      page.lines.push('');
+      page.lines.push(...lines);
+    }
+
+    return page;
+  };
+
+  const titlePage = addPage('title');
+  addLines(titlePage, [
+    '',
+    '',
+    title,
+    subtitle,
+    '',
+    `Por ${author || 'Nexauren'}`,
+    '',
+    '',
+    'NEXAURENBOOKS',
+  ]);
+
+  const copyrightPage = addPage('copyright');
+  addLines(copyrightPage, [
+    '',
+    'Direitos de autor',
+    '',
+    `Copyright © ${new Date().getFullYear()} ${author || 'Nexauren'}.`,
+    'Todos os direitos reservados.',
+    '',
+    'Esta edição digital foi preparada pela NexaurenBooks.',
+    `Idioma: ${language || 'pt-PT'}`,
+  ]);
+
   for (const item of frontMatter) {
     const type = String(item.type || '').toLowerCase();
-    const titleText = String(item.title || 'Secção inicial');
-    if (type.includes('contents') || type.includes('index') || titleText.toLowerCase() === 'índice') continue;
-    addSection(titleText, item.content || '');
+    const heading = String(item.title || 'Secção inicial').trim();
+    if (
+      type.includes('contents')
+      || type.includes('index')
+      || heading.toLowerCase() === 'índice'
+    ) {
+      continue;
+    }
+
+    const page = addPage('front');
+    page.lines.push('', heading, '');
+    const paragraphs = String(item.content || '')
+      .replace(/\r/g, '')
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    addParagraphsToPages(paragraphs);
   }
 
-  if (chapters.length) {
-    addSection('Índice', chapters
-      .map((chapter) => `${chapter.chapter_number} · ${chapter.title || 'Sem título'}`)
-      .join('\n'));
+  const contentsPage = addPage('toc');
+  addLines(contentsPage, ['', 'Índice', '']);
+  for (const chapter of chapters) {
+    const lines = wrapPdfText(
+      `Capítulo ${chapter.chapter_number} · ${chapter.title || 'Sem título'}`,
+      56,
+    );
+    if (contentsPage.lines.length + lines.length + 1 > maxBodyLines) {
+      addPage('toc');
+    }
+    const target = pages.at(-1);
+    target.lines.push(...lines, '');
   }
 
   for (const chapter of chapters) {
-    const heading = `Capítulo ${chapter.chapter_number}: ${chapter.title || ''}`.trim();
-    const headingLines = wrapText(heading, 54);
-    const bodyLines = String(chapter.content || '')
+    let page = addPage('chapter');
+    page.lines.push('', `Capítulo ${chapter.chapter_number}`, chapter.title || 'Sem título', '');
+
+    const paragraphs = String(chapter.content || '')
       .replace(/\r/g, '')
-      .split(/\n+/)
-      .flatMap((line) => {
-        const text = line.trim();
-        return text ? wrapText(text, 92) : [''];
-      });
-    for (const line of ['', ...headingLines, '', ...bodyLines, '']) {
-      if (pageLines.length >= 47) flush();
-      pageLines.push(line);
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    for (const paragraph of paragraphs) {
+      const lines = wrapPdfText(paragraph, 56);
+
+      if (page.lines.length + lines.length + 1 > maxBodyLines) {
+        page = addPage('body');
+      }
+
+      page.lines.push(...lines, '');
     }
   }
 
   for (const item of backMatter) {
-    addSection(item.title || 'Secção final', item.content || '');
+    const heading = String(item.title || 'Secção final').trim();
+    const page = addPage('back');
+    page.lines.push('', heading, '');
+    const paragraphs = String(item.content || '')
+      .replace(/\r/g, '')
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    addParagraphsToPages(paragraphs);
   }
 
-  flush();
-  if (!pages.length) pages.push([title, `Por ${author}`, '', 'O livro está pronto para receber conteúdo.']);
+  if (!chapters.length) {
+    addPage('body').lines.push(
+      '',
+      'O manuscrito ainda não contém capítulos.',
+    );
+  }
 
-  const objects = ['', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+  const objects = [
+    null,
+    null,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ];
+
   const pageIds = [];
   const contentIds = [];
   const pagesId = 2;
   const fontId = 3;
 
-  for (const lines of pages) {
+  for (let index = 0; index < pages.length; index += 1) {
+    const page = pages[index];
     pageIds.push(objects.length + 1);
     contentIds.push(objects.length + 2);
-    const commands = ['BT', '/F1 18 Tf', '54 770 Td'];
-    commands.push(`(${textEscapePdf(lines[0] || title)}) Tj`);
-    commands.push('/F1 11 Tf', '0 -24 Td');
-    for (let i = 1; i < lines.length; i += 1) {
-      commands.push(`(${textEscapePdf(lines[i])}) Tj`, '0 -14 Td');
+
+    const commands = [];
+    const addText = (textValue, fontSize, x, y) => {
+      commands.push(
+        asciiBytes(
+          `BT /F1 ${fontSize} Tf 1 0 0 1 ${x} ${y} Tm (`,
+        ),
+        pdfLiteralBytes(textValue),
+        asciiBytes(') Tj ET\\n'),
+      );
+    };
+
+    let y = topY;
+
+    for (let lineIndex = 0; lineIndex < page.lines.length; lineIndex += 1) {
+      const line = page.lines[lineIndex];
+
+      if (page.kind === 'title' && lineIndex === 2) {
+        addText(line, 24, marginX, y);
+        y -= 30;
+        continue;
+      }
+
+      if (
+        page.kind === 'title'
+        && lineIndex === 5
+      ) {
+        addText(line, 12, marginX, y);
+        y -= 24;
+        continue;
+      }
+
+      const fontSize = page.kind === 'chapter'
+        && lineIndex === 1 ? 16
+        : page.kind === 'chapter'
+          && lineIndex === 2 ? 11
+          : 10.5;
+
+      if (line) {
+        addText(
+          line,
+          fontSize,
+          marginX,
+          y,
+        );
+      }
+
+      y -= page.kind === 'chapter' && lineIndex <= 2
+        ? 22
+        : leading;
+
+      if (y < bottomY + 16) break;
     }
-    commands.push('ET');
-    const stream = commands.join('\n');
-    objects.push(
-      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds.at(-1)} 0 R >>`,
+
+    if (page.kind !== 'title') {
+      addText(
+        String(index),
+        8.5,
+        pageWidth / 2 - 4,
+        bottomY - 14,
+      );
+    }
+
+    const streamParts = commands;
+    const streamLength = streamParts.reduce(
+      (total, item) => total + item.length,
+      0,
     );
-    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+
+    objects.push(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds.at(-1)} 0 R >>`,
+    );
+
+    objects.push({
+      streamParts,
+      streamLength,
+    });
   }
 
-  objects[0] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  objects[0] = '<< /Type /Catalog /Pages 2 0 R >>';
   objects[1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] >>`;
 
-  const header = '%PDF-1.4\n%NEXAUREN\n';
+  const header = asciiBytes('%PDF-1.4\\n%NEXAUREN\\n');
   const chunks = [header];
   const offsets = [0];
   let position = header.length;
+
   for (let i = 0; i < objects.length; i += 1) {
     const number = i + 1;
-    const body = `${number} 0 obj\n${objects[i]}\nendobj\n`;
+    const object = objects[i];
+
+    if (typeof object === 'string') {
+      const body = asciiBytes(
+        `${number} 0 obj\\n${object}\\nendobj\\n`,
+      );
+      offsets[number] = position;
+      chunks.push(body);
+      position += body.length;
+      continue;
+    }
+
+    const prefix = asciiBytes(
+      `${number} 0 obj\\n<< /Length ${object.streamLength} >>\\nstream\\n`,
+    );
+    const suffix = asciiBytes('endstream\\nendobj\\n');
     offsets[number] = position;
-    chunks.push(body);
-    position += body.length;
+    chunks.push(prefix);
+
+    for (const part of object.streamParts) chunks.push(part);
+
+    chunks.push(suffix);
+    position += prefix.length
+      + object.streamLength
+      + suffix.length;
   }
+
   const xrefOffset = position;
-  chunks.push(`xref\n0 ${objects.length + 1}\n`);
-  chunks.push('0000000000 65535 f \n');
-  for (let i = 1; i <= objects.length; i += 1) {
-    chunks.push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
-  }
   chunks.push(
-    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
+    asciiBytes(
+      `xref\\n0 ${objects.length + 1}\\n`,
+    ),
   );
-  return new TextEncoder().encode(chunks.join(''));
+  chunks.push(asciiBytes('0000000000 65535 f \\n'));
+
+  for (let i = 1; i <= objects.length; i += 1) {
+    chunks.push(
+      asciiBytes(
+        `${String(offsets[i]).padStart(10, '0')} 00000 n \\n`,
+      ),
+    );
+  }
+
+  chunks.push(
+    asciiBytes(
+      `trailer\\n<< /Size ${objects.length + 1} /Root 1 0 R >>\\nstartxref\\n${xrefOffset}\\n%%EOF`,
+    ),
+  );
+
+  return concatBytes(chunks);
 }
 
 function crc32(bytes) {
@@ -2449,7 +3055,14 @@ async function publicBooksApi(request, env) {
     const structure = bookContext?.story_bible?.outline || null;
     const filename = `${slugify(book.title) || 'nexauren-book'}.${format}`;
     const bytes = format === 'pdf'
-      ? buildPdf(book.title, book.author, chapters, structure)
+      ? buildPdf(
+          book.title,
+          book.author,
+          chapters,
+          structure,
+          book.subtitle || '',
+          book.language || 'pt-PT',
+        )
       : buildEpub(
           book.title,
           book.author,
