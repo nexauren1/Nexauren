@@ -636,7 +636,7 @@ function parseChapterSize(value) {
   const text = String(value || '')
     .replace(/\u00a0/g, ' ')
     .trim();
-  const match = text.match(/(\\d[\\d\\s.,]*)\\s*[\\-–—]\\s*(\\d[\\d\\s.,]*)/);
+  const match = text.match(/(\d[\d\s.,]*)\s*[\-–—]\s*(\d[\d\s.,]*)/);
   if (!match) {
     return { min: 800, max: 1200, target: 1000 };
   }
@@ -661,7 +661,7 @@ function parseChapterSize(value) {
 function countWords(value) {
   return String(value || '')
     .trim()
-    .split(/\\s+/)
+    .split(/\s+/)
     .filter(Boolean)
     .length;
 }
@@ -670,7 +670,7 @@ function chapterManuscriptIssues(contentValue, range) {
   const content = String(contentValue || '').trim();
   const words = countWords(content);
   const paragraphs = content
-    .split(/\\n{2,}/)
+    .split(/\n{2,}/)
     .map((item) => item.trim())
     .filter(Boolean);
   const minimumAcceptable = Math.max(
@@ -811,10 +811,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       userPrompt,
       structured = true,
       maxTokens = action === 'chapter'
-        ? 8000
+        ? 9000
         : action === 'story_bible'
-          ? 5000
-          : 4500,
+          ? 6500
+          : 5000,
     ) => env.AI.run(
       TEXT_MODEL,
       {
