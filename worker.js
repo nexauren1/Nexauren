@@ -703,7 +703,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         system,
         [user, compactRule].join('\\n\\n'),
         true,
-        12000,
+        8000,
       );
       response = parseAIJsonResponse(result);
     } catch (error) {
