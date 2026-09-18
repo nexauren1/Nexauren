@@ -726,14 +726,14 @@ async function saveResearch(env, bookId, report) {
   ).run();
 }
 
-async function saveStoryBible(env, bookId, bible) {
+async function saveStoryBible(env, bookId, bible, locked = false) {
   await env.BOOKS_DB.prepare(
     `INSERT INTO story_bibles
       (book_id, identity_json, world_json, characters_json,
        relations_json, story_json, timeline_json, chapters_json,
        style_json, continuity_json, continuation_json,
        canon_locked, version, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
      ON CONFLICT(book_id) DO UPDATE SET
        identity_json = excluded.identity_json,
        world_json = excluded.world_json,
@@ -745,6 +745,7 @@ async function saveStoryBible(env, bookId, bible) {
        style_json = excluded.style_json,
        continuity_json = excluded.continuity_json,
        continuation_json = excluded.continuation_json,
+       canon_locked = excluded.canon_locked,
        version = story_bibles.version + 1,
        updated_at = excluded.updated_at`,
   ).bind(
@@ -759,6 +760,7 @@ async function saveStoryBible(env, bookId, bible) {
     JSON.stringify(bible.style || {}),
     JSON.stringify(bible.continuity || {}),
     JSON.stringify(bible.continuation || {}),
+    locked ? 1 : 0,
     now(),
   ).run();
 }
@@ -918,27 +920,55 @@ async function adminAI(request, env, admin) {
   }
 
   if (action === 'story_bible') {
-    const research = context.research_notes
-      .slice(0, 3)
-      .map((item) => clip(item.note, 10000))
-      .join('\n---\n');
+    if (context.story_bible?.canon_locked) {
+      return json({
+        error: 'A Bíblia Oficial já foi aprovada e está bloqueada.',
+      }, 409);
+    }
+
     const bible = await runAIJson(
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Story Architect, Character Designer and World Builder. Build a structured Story Bible from the author idea and research draft. Research is advisory, not canon. Use stable IDs such as char_kael_01 and loc_porto_01. Keep every field explicit enough for later continuity checks. Never invent a citation. Return only JSON matching the schema.',
-      `${base}\n\nResearch draft (not canon):\n${clip(research, 24000)}\n\nCreate the Story Bible now.`,
+      'You are the NexaurenBooks Official Story Bible Architect. Create the official creative canon from the author inputs only. The Story Bible becomes the single source of truth for the future book. Never write chapters. Preserve the title, idea, genre, series requirements and chapter-size requirements. Define identity, premise, themes, characters, relationships, world, timeline, style, continuity rules and continuation rules. Use stable IDs. Return only JSON matching the schema.',
+      `${base}\n\nBook requirements:\n- Genre: ${context.genre || 'Not specified'}\n- Series name: ${context.series_name || 'Standalone'}\n- Series size: ${context.series_size || 'Not specified'}\n- Chapter size: ${context.chapter_size || context.desired_size || 'Not specified'}\n\nCreate the Official Story Bible now.`,
       STORY_BIBLE_SCHEMA,
       admin.user_id,
     );
-    await saveStoryBible(env, bookId, bible);
+    await saveStoryBible(env, bookId, bible, false);
     await env.BOOKS_DB.prepare(
       `UPDATE books SET status = 'planning', updated_at = ? WHERE id = ?`,
     ).bind(now(), bookId).run();
-    return json({ ok: true, action, bible });
+    return json({ ok: true, action, bible, locked: false });
+  }
+
+  if (action === 'approve_bible') {
+    if (!context.story_bible) {
+      return json({ error: 'Cria a Bíblia Oficial primeiro.' }, 400);
+    }
+
+    await env.BOOKS_DB.prepare(
+      `UPDATE story_bibles
+          SET canon_locked = 1,
+              version = version + 1,
+              updated_at = ?
+        WHERE book_id = ?`,
+    ).bind(now(), bookId).run();
+
+    return json({
+      ok: true,
+      action,
+      locked: true,
+      bible: (await getBookContext(env, bookId)).story_bible,
+    });
   }
 
   if (action === 'structure' || action === 'outline') {
+    if (!context.story_bible?.canon_locked) {
+      return json({
+        error: 'A Bíblia Oficial precisa ser aprovada antes de criar o livro.',
+      }, 400);
+    }
     const structure = await runAIJson(
       env,
       action,
@@ -956,6 +986,11 @@ async function adminAI(request, env, admin) {
   }
 
   if (action === 'chapter') {
+    if (!context.story_bible?.canon_locked) {
+      return json({
+        error: 'A Bíblia Oficial precisa ser aprovada antes de escrever o livro.',
+      }, 400);
+    }
     const chapterNumber = Math.max(1, Number(body?.chapter_number || 1));
     const structure = context.story_bible?.outline;
     const plannedChapters = Array.isArray(structure?.chapters)
@@ -1239,6 +1274,9 @@ async function adminApi(request, env) {
       ? body.status
       : 'draft';
     const price = Number(body?.price_usd || 0).toFixed(2);
+    const seriesName = String(body?.series_name || '').trim();
+    const seriesSize = Math.max(0, Math.floor(Number(body?.series_size || 0)));
+    const chapterSize = String(body?.chapter_size || '').trim();
     const publishedAt = status === 'published' ? createdAt : null;
 
     await env.BOOKS_DB.prepare(
@@ -1311,6 +1349,34 @@ async function adminApi(request, env) {
       }),
       createdAt,
     ).run();
+    await env.BOOKS_DB.prepare(
+      `INSERT INTO book_metadata
+        (book_id, metadata_json, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(book_id) DO UPDATE SET
+         metadata_json = excluded.metadata_json,
+         updated_at = excluded.updated_at`,
+    ).bind(
+      id,
+      JSON.stringify({
+        creation: {
+          series_name: seriesName,
+          series_size: seriesSize,
+          chapter_size: chapterSize,
+        },
+        publication: {
+          author: String(body?.author || 'Nexauren').trim() || 'Nexauren',
+          language: String(body?.language || 'pt-PT').trim() || 'pt-PT',
+          audience: String(body?.audience || '').trim(),
+          age_rating: String(body?.age_rating || '').trim(),
+          price_usd: price,
+          currency: 'USD',
+          pdf: true,
+          epub: true,
+        },
+      }),
+      createdAt,
+    ).run();
     return json({ ok: true, id, slug }, 201);
   }
 
@@ -1350,8 +1416,39 @@ async function adminApi(request, env) {
       if (!allowedStatuses.includes(body.status)) {
         return json({ error: 'Invalid book status.' }, 400);
       }
+
+      if (body.status === 'published') {
+        const bible = await env.BOOKS_DB.prepare(
+          `SELECT canon_locked
+             FROM story_bibles
+            WHERE book_id = ?
+            LIMIT 1`,
+        ).bind(bookId).first();
+
+        const chapterCount = await env.BOOKS_DB.prepare(
+          `SELECT COUNT(*) AS total
+             FROM chapter_versions
+            WHERE book_id = ?
+              AND is_current = 1
+              AND length(trim(content)) > 0`,
+        ).bind(bookId).first();
+
+        if (!Number(bible?.canon_locked)) {
+          return json({
+            error: 'A Bíblia Oficial precisa estar aprovada antes da publicação.',
+          }, 400);
+        }
+
+        if (Number(chapterCount?.total || 0) < 1) {
+          return json({
+            error: 'Escreve pelo menos um capítulo antes de publicar.',
+          }, 400);
+        }
+      }
+
       fields.push('status = ?');
       values.push(body.status === 'approved' ? 'review' : body.status);
+
       if (body.status === 'published') {
         fields.push('published_at = COALESCE(published_at, ?)');
         values.push(now());
