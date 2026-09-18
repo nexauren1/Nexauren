@@ -1025,8 +1025,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
       maxTokens = action === 'chapter'
         ? 9000
         : action === 'story_bible'
-          ? 6500
-          : 5000,
+          ? 8500
+          : action === 'structure'
+            ? 6500
+            : 5000,
     ) => env.AI.run(
       TEXT_MODEL,
       {
@@ -1080,8 +1082,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
         action === 'chapter'
           ? 9000
           : action === 'story_bible'
-            ? 6500
-            : 5000,
+            ? 8500
+            : action === 'structure'
+              ? 6500
+              : 5000,
       );
       response = validateAIResponse(
         action,
@@ -1111,8 +1115,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
       const retryTokens = action === 'chapter'
         ? 9000
         : action === 'story_bible'
-          ? 6500
-          : 5000;
+          ? 8500
+          : action === 'structure'
+            ? 6500
+            : 5000;
 
       try {
         result = await aiRequest(
@@ -1171,6 +1177,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId, qua
         response = validateAIResponse(
           action,
           parseAIJsonResponse(result),
+          qualityContext,
         );
       } catch (thirdError) {
         throw friendlyAIError(thirdError || firstError);
