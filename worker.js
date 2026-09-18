@@ -594,12 +594,19 @@ function parseAIJsonResponse(result) {
     try {
       return JSON.parse(candidate);
     } catch {
-      // Tenta a próxima representação possível.
+      try {
+        const repaired = candidate
+          .replace(/,\\s*([}\\]])/g, '$1')
+          .replace(/([\\{,]\\s*)([A-Za-z_$][A-Za-z0-9_$-]*)\\s*:/g, '$1"$2":');
+        return JSON.parse(repaired);
+      } catch {
+        // Tenta a próxima representação possível.
+      }
     }
   }
 
   throw new Error(
-    'Workers AI não devolveu JSON válido. A resposta pode ter sido cortada; tente novamente.',
+    'Workers AI devolveu JSON inválido. A estrutura foi interrompida ou contém uma propriedade malformada.',
   );
 }
 
