@@ -65,6 +65,17 @@ function setInline(id, message, kind = '') {
   node.className = 'inline-status' + (kind ? ' ' + kind : '');
 }
 
+function cleanApiError(value) {
+  const message = String(value || '').trim();
+
+  if (/unterminated string in json|json\.parse|unexpected token|invalid json|json mode/i.test(message)) {
+    return 'A IA não conseguiu concluir esta etapa correctamente. Tenta novamente.';
+  }
+
+  return message || 'O pedido falhou.';
+}
+
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: 'same-origin',
@@ -86,7 +97,7 @@ async function api(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(data.error || 'O pedido falhou.');
+    throw new Error(cleanApiError(data.error));
   }
   return data;
 }
