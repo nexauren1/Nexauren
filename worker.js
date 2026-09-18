@@ -581,7 +581,7 @@ function parseAIJsonResponse(result) {
   }
 
   const candidates = [text];
-  const fenced = text.match(/\`\`\`(?:json)?\\s*([\\s\\S]*?)\`\`\`/i);
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced?.[1]) candidates.push(fenced[1].trim());
 
   const firstObject = text.indexOf('{');
