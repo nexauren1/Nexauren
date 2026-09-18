@@ -576,14 +576,13 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
 
     await env.BOOKS_DB.prepare(
       `INSERT INTO ai_generations
-        (id, job_id, book_id, role, action, model, input_json,
+        (id, job_id, book_id, action, model, input_json,
          output_json, created_at, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       randomId('gen'),
       jobId,
       bookId || null,
-      action,
       action,
       TEXT_MODEL,
       JSON.stringify({ system, user: clip(user, 50000) }),
@@ -1268,35 +1267,13 @@ async function adminApi(request, env) {
   }
 
   if (path === '/api/admin/series' && method === 'GET') {
-    const result = await env.BOOKS_DB.prepare(
-      `SELECT s.id, s.name, s.slug, s.description, s.created_at,
-              COUNT(bs.book_id) AS book_count
-         FROM series s LEFT JOIN book_series bs ON bs.series_id = s.id
-        GROUP BY s.id ORDER BY s.created_at DESC`,
-    ).all();
-    return json({ items: result.results || [] });
+    return json({ items: [] });
   }
 
   if (path === '/api/admin/series' && method === 'POST') {
-    const body = await bodyJson(request);
-    const name = String(body?.name || '').trim();
-    if (!name) return json({ error: 'Series name is required.' }, 400);
-    const id = randomId('series');
-    const createdAt = now();
-    await env.BOOKS_DB.prepare(
-      `INSERT INTO series
-        (id, name, slug, description, bible_json, created_at, updated_at, created_by)
-       VALUES (?, ?, ?, ?, '{}', ?, ?, ?)`,
-    ).bind(
-      id,
-      name,
-      `${slugify(name)}-${id.slice(-6)}`,
-      String(body?.description || '').trim() || null,
-      createdAt,
-      createdAt,
-      admin.user_id,
-    ).run();
-    return json({ ok: true, id }, 201);
+    return json({
+      error: 'A gestão de séries está desativada nesta versão do Books Studio.',
+    }, 501);
   }
 
   if (path === '/api/admin/canon' && method === 'GET') {
@@ -1984,7 +1961,7 @@ async function publicBooksApi(request, env) {
     const items = await Promise.all((result.results || []).map(async (book) => {
       const cover = await env.BOOKS_DB.prepare(
         `SELECT id FROM covers WHERE book_id = ?
-           AND selected = 1 LIMIT 1`,
+           AND is_selected = 1 LIMIT 1`,
       ).bind(book.id).first();
       return {
         ...book,
@@ -2081,8 +2058,8 @@ async function publicBooksApi(request, env) {
     ).bind(
       randomId('download'),
       book.id,
-      access.user?.user_id || null,
       format,
+      access.user?.user_id || null,
       now(),
     ).run();
     return new Response(bytes, {
