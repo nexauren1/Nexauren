@@ -152,6 +152,10 @@ function hasBible(book = state.currentBook) {
   return Boolean(book?.story_bible && Object.keys(book.story_bible).length);
 }
 
+function hasApprovedBible(book = state.currentBook) {
+  return Boolean(book?.story_bible?.canon_locked);
+}
+
 function hasStructure(book = state.currentBook) {
   return bookStructure(book).chapters.length > 0;
 }
@@ -163,7 +167,6 @@ function progress(book = state.currentBook) {
   if (currentChapters(book).length) return 2;
   if (hasStructure(book)) return 2;
   if (hasBible(book)) return 1;
-  if (hasResearch(book)) return 1;
   return 0;
 }
 
@@ -242,20 +245,26 @@ function renderDashboard() {
   $('progress-fill').style.width = Math.round((p / 4) * 100) + '%';
 
   const next = p === 0
-    ? ['Criar o primeiro livro', 'Só precisas do título e da ideia.', 'Criar livro', 'prepare']
-    : p === 1
-      ? ['Preparar a estrutura', 'A IA vai terminar a pesquisa, Story Bible e índice.', 'Preparar com IA', 'prepare']
-      : p === 2
-        ? ['Continuar a escrita', 'Escolhe o próximo capítulo e deixa a IA escrever.', 'Escrever', 'writing']
-        : p === 3
-          ? ['Preparar publicação', 'Confirma a revisão e trata da capa e dos ficheiros.', 'Publicar', 'publish']
-          : ['Livro publicado', 'O projecto já passou pelo percurso principal.', 'Abrir publicação', 'publish'];
+    ? ['Criar o primeiro livro', 'Define a ficha básica e os dados de publicação.', 'Criar livro', 'prepare']
+    : p === 1 && !hasApprovedBible(book)
+      ? ['Aprovar Bíblia Oficial', 'Revê a Bíblia criada pela IA e bloqueia o canon antes da escrita.', 'Aprovar Bíblia', 'prepare']
+      : p === 1
+        ? ['Criar estrutura do livro', 'A Bíblia está oficial. Agora cria o índice e os capítulos planeados.', 'Criar estrutura', 'prepare']
+        : p === 2
+          ? ['Continuar a escrita', 'Escreve os capítulos seguindo a Bíblia Oficial.', 'Escrever', 'writing']
+          : p === 3
+            ? ['Preparar publicação', 'Confirma a revisão e trata da capa e dos ficheiros.', 'Publicar', 'publish']
+            : ['Livro publicado', 'O livro já passou pelo percurso principal.', 'Abrir publicação', 'publish'];
 
   $('next-title').textContent = next[0];
   $('next-copy').textContent = next[1];
   $('next-button').textContent = next[2];
   $('next-button').dataset.nextSection = next[3];
-  $('next-button').dataset.nextAction = p === 0 ? 'new' : p === 1 ? 'prepare' : '';
+  $('next-button').dataset.nextAction = p === 0
+    ? 'new'
+    : p === 1
+      ? (hasApprovedBible(book) ? 'structure' : 'approve')
+      : '';
 
   const flow = [...document.querySelectorAll('#dashboard-flow button')];
   flow.forEach((button, index) => button.classList.toggle('done', index < p));
@@ -268,36 +277,79 @@ function renderPrepare() {
 
   if (!book) return;
 
+  $('prepare-stage').textContent = statusLabel(book.status);
   $('prepare-book-title').textContent = book.title || 'Sem título';
-  $('prepare-book-idea').textContent = book.premise || book.description || 'Sem ideia registada.';
+  $('prepare-book-idea').textContent =
+    book.premise || book.description || 'Sem ideia registada.';
 
-  const structure = bookStructure(book);
-  const stages = {
-    research: hasResearch(book),
-    bible: hasBible(book),
-    structure: structure.chapters.length > 0,
-  };
+  const creation = book.book_metadata?.creation || {};
+  const publication = book.book_metadata?.publication || {};
 
-  document.querySelectorAll('.prepare-step').forEach((item) => {
-    const key = item.dataset.stage;
-    const ready = Boolean(stages[key]);
-    item.classList.toggle('complete', ready);
-    item.querySelector('.step-state').textContent = ready ? 'Concluído' : 'Por fazer';
-  });
-
-  const research = book?.research_notes?.[0];
-  $('research-view').innerHTML = research
-    ? '<strong>Pesquisa criada.</strong><p>' + escapeHtml(research.title || 'Relatório de pesquisa') + '</p>'
-    : '<p class="reader-empty">Ainda não existe pesquisa.</p>';
+  $('prepare-book-meta').innerHTML = [
+    book.genre,
+    creation.series_name
+      ? 'Série: ' + creation.series_name
+      : null,
+    creation.series_size
+      ? creation.series_size + ' livros na série'
+      : null,
+    creation.chapter_size
+      ? 'Capítulos: ' + creation.chapter_size
+      : null,
+  ]
+    .filter(Boolean)
+    .map((tag) => '<span class="tag">' + escapeHtml(tag) + '</span>')
+    .join('');
 
   const bible = book.story_bible;
+  const bibleReady = hasBible(book);
+  const bibleLocked = hasApprovedBible(book);
+  const structure = bookStructure(book);
+  const structureReady = bibleLocked && structure.chapters.length > 0;
+
+  $('bible-lock-state').textContent = !bibleReady
+    ? 'Ainda não criada'
+    : bibleLocked
+      ? 'Oficial · bloqueada'
+      : 'Criada · por aprovar';
+
+  $('bible-generate').disabled = state.busy || bibleLocked;
+  $('bible-approve').disabled = state.busy || !bibleReady || bibleLocked;
+  $('book-structure').disabled = state.busy || !bibleLocked || structureReady;
+
+  $('bible-summary').innerHTML = bible
+    ? '<div class="result-line"><strong>Bíblia Oficial</strong>' +
+      '<p>' + (bibleLocked
+        ? 'A Bíblia foi aprovada e está bloqueada. Os capítulos deverão seguir este canon.'
+        : 'A Bíblia foi criada. Revê o resultado e aprova para a tornar oficial.') +
+      '</p></div>' +
+      '<div class="result-line"><strong>Conteúdo</strong><p>' +
+      countText((bible.characters || []).length) + ' personagens · ' +
+      countText((bible.timeline || []).length) + ' pontos de cronologia · ' +
+      countText((bible.relations || []).length) + ' relações</p></div>'
+    : '<p class="reader-empty">A Bíblia ainda não foi criada.</p>';
+
   $('bible-view').innerHTML = bible
-    ? '<strong>Story Bible criada.</strong><p>Personagens, mundo, relações e continuidade estão disponíveis para a escrita.</p>'
-    : '<p class="reader-empty">Ainda não existe uma Story Bible.</p>';
+    ? '<strong>Bíblia Oficial criada.</strong><p>' +
+      (bibleLocked ? 'Canon bloqueado.' : 'A aguardar aprovação.') + '</p>'
+    : '<p class="reader-empty">Ainda não existe uma Bíblia Oficial.</p>';
+
+  $('research-view').innerHTML =
+    '<p class="reader-empty">A pesquisa não é necessária neste fluxo simples.</p>';
 
   $('structure-view').innerHTML = structure.chapters.length
-    ? '<strong>Índice criado.</strong><p>' + structure.chapters.length + ' capítulos planeados.</p>'
-    : '<p class="reader-empty">Ainda não existe estrutura.</p>';
+    ? '<strong>Estrutura criada.</strong><p>' +
+      structure.chapters.length + ' capítulos planeados.</p>'
+    : '<p class="reader-empty">' +
+      (bibleLocked
+        ? 'A estrutura ainda não foi criada.'
+        : 'Aprova a Bíblia antes de criar a estrutura.') +
+      '</p>';
+
+  const publication = book.book_metadata?.publication || {};
+  if (publication.author && $('prepare-book-meta')) {
+    // O resumo já mostra os dados de criação; publicação fica na etapa final.
+  }
 }
 
 function structureItem(item, index) {
@@ -495,55 +547,94 @@ async function createBook(body) {
       title: body.title.trim(),
       premise: body.premise.trim(),
       description: body.premise.trim(),
-      author: state.user?.name || 'Nexauren',
-      language: 'pt-PT',
-      approx_chapter_count: 12,
+      genre: body.genre.trim(),
+      series_name: body.series_name.trim(),
+      series_size: Number(body.series_size || 0),
+      chapter_size: body.chapter_size.trim(),
+      author: body.author.trim() || state.user?.name || 'Nexauren',
+      language: body.language.trim() || 'pt-PT',
+      audience: body.audience.trim(),
+      age_rating: body.age_rating.trim(),
+      price_usd: Number(body.price_usd || 0).toFixed(2),
     }),
   });
+
   await loadBooks();
   await selectBook(data.id, false);
 }
 
-async function prepareBook() {
-  if (!state.currentBook) throw new Error('Cria ou selecciona um livro primeiro.');
+async function runBibleAction(action, successMessage) {
+  if (!state.currentBook || state.busy) return;
 
-  const button = $('prepare-all');
   state.busy = true;
-  button.disabled = true;
-  button.textContent = 'A preparar…';
-
-  const steps = [
-    ['research', 'research', 'A pesquisar a ideia…'],
-    ['bible', 'story_bible', 'A criar a Story Bible…'],
-    ['structure', 'structure', 'A criar o índice e a estrutura…'],
-  ];
+  $('bible-generate').disabled = true;
+  $('bible-approve').disabled = true;
+  $('book-structure').disabled = true;
 
   try {
-    for (const [uiStage, action, message] of steps) {
-      const row = document.querySelector('.prepare-step[data-stage="' + uiStage + '"]');
-      if (row) {
-        row.classList.add('working');
-        row.querySelector('.step-state').textContent = message.replace('A ', '').replace('…', '');
-      }
-      setGlobal(message, 'busy');
-      await api('/api/admin/ai', {
-        method: 'POST',
-        body: JSON.stringify({
-          action,
-          book_id: state.currentBook.id,
-        }),
-      });
-      await selectBook(state.currentBook.id, false);
-    }
+    setGlobal('A processar a Bíblia Oficial…', 'busy');
 
-    setGlobal('Livro preparado. O índice e os capítulos já estão prontos.', 'success');
+    await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action,
+        book_id: state.currentBook.id,
+      }),
+    });
+
+    await selectBook(state.currentBook.id, false);
+    setGlobal(successMessage, 'success');
+  } catch (error) {
+    setGlobal(error.message, 'error');
+  } finally {
+    state.busy = false;
+    renderPrepare();
+  }
+}
+
+async function generateBible() {
+  return runBibleAction(
+    'story_bible',
+    'Bíblia Oficial criada. Revê-a antes de aprovar.',
+  );
+}
+
+async function approveBible() {
+  return runBibleAction(
+    'approve_bible',
+    'Bíblia Oficial aprovada e bloqueada. Agora podes criar o livro.',
+  );
+}
+
+async function generateStructure() {
+  if (!state.currentBook || state.busy) return;
+
+  if (!hasApprovedBible(state.currentBook)) {
+    setGlobal('Aprova a Bíblia Oficial antes de criar o livro.', 'error');
+    return;
+  }
+
+  state.busy = true;
+  $('book-structure').disabled = true;
+
+  try {
+    setGlobal('A criar a estrutura do livro…', 'busy');
+
+    await api('/api/admin/ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'structure',
+        book_id: state.currentBook.id,
+      }),
+    });
+
+    await selectBook(state.currentBook.id, false);
+    setGlobal('Estrutura criada. O próximo passo é escrever os capítulos.', 'success');
     goTo('writing');
   } catch (error) {
     setGlobal(error.message, 'error');
   } finally {
     state.busy = false;
-    button.disabled = false;
-    button.textContent = 'Preparar com IA';
     renderPrepare();
   }
 }
@@ -815,47 +906,85 @@ $('mobile-book-context')?.addEventListener('change', async (event) => {
 $('next-button')?.addEventListener('click', () => {
   const action = $('next-button').dataset.nextAction;
   const section = $('next-button').dataset.nextSection || 'prepare';
+
   if (action === 'new') {
     state.currentBook = null;
     state.selectedChapter = null;
     localStorage.removeItem('nexauren_books_admin_book');
     $('book-form')?.reset();
+    goTo('prepare');
+    return;
   }
+
+  if (action === 'approve' && state.currentBook) {
+    goTo('prepare');
+    setTimeout(() => $('bible-approve')?.click(), 120);
+    return;
+  }
+
+  if (action === 'structure' && state.currentBook) {
+    goTo('prepare');
+    setTimeout(() => $('book-structure')?.click(), 120);
+    return;
+  }
+
   goTo(section);
-  setTimeout(() => {
-    if (action === 'prepare' && state.currentBook) $('prepare-all')?.click();
-  }, 120);
 });
 
 $('book-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
-  const title = safeText(form.elements.title?.value);
-  const premise = safeText(form.elements.premise?.value);
 
-  if (!title || !premise) {
-    setInline('book-form-status', 'Indica o título e a ideia do livro.', 'error');
+  const payload = {
+    title: safeText(form.elements.title?.value),
+    premise: safeText(form.elements.premise?.value),
+    genre: safeText(form.elements.genre?.value),
+    series_name: safeText(form.elements.series_name?.value),
+    series_size: safeText(form.elements.series_size?.value),
+    chapter_size: safeText(form.elements.chapter_size?.value),
+    author: safeText(form.elements.author?.value),
+    language: safeText(form.elements.language?.value),
+    audience: safeText(form.elements.audience?.value),
+    age_rating: safeText(form.elements.age_rating?.value),
+    price_usd: safeText(form.elements.price_usd?.value),
+  };
+
+  if (!payload.title || !payload.premise || !payload.genre || !payload.chapter_size) {
+    setInline(
+      'book-form-status',
+      'Preenche título, ideia, género e tamanho do capítulo.',
+      'error',
+    );
     return;
   }
 
   const button = $('book-save');
   button.disabled = true;
   button.textContent = 'A criar…';
-  setInline('book-form-status', 'A criar o projecto…');
+  setInline('book-form-status', 'A guardar os dados do projecto…');
+
   try {
-    await createBook({ title, premise });
-    setInline('book-form-status', 'Livro criado.', 'success');
-    setGlobal('Livro criado. Vamos preparar a história.', 'success');
+    await createBook(payload);
+    setInline(
+      'book-form-status',
+      'Projecto criado. Agora vem a Bíblia Oficial.',
+      'success',
+    );
+    setGlobal('Projecto criado. Cria a Bíblia Oficial primeiro.', 'success');
     goTo('prepare');
   } catch (error) {
     setInline('book-form-status', error.message, 'error');
   } finally {
     button.disabled = false;
-    button.textContent = 'Criar livro';
+    button.textContent = 'Criar projecto';
   }
 });
 
-$('prepare-all')?.addEventListener('click', prepareBook);
+$(
+  'bible-generate'
+)?.addEventListener('click', generateBible);
+$('bible-approve')?.addEventListener('click', approveBible);
+$('book-structure')?.addEventListener('click', generateStructure);
 $('write-next')?.addEventListener('click', () => writeChapter(nextChapterNumber()));
 $('review-all')?.addEventListener('click', reviewBook);
 $('cover-generate')?.addEventListener('click', generateCover);
