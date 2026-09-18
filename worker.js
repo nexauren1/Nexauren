@@ -625,20 +625,52 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
   ).bind(jobId, bookId || null, action, TEXT_MODEL, started, adminId).run();
 
   try {
-    const result = await env.AI.run(TEXT_MODEL, {
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: schema,
+    const aiRequest = (systemPrompt, userPrompt) => env.AI.run(
+      TEXT_MODEL,
+      {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: schema,
+        },
+        max_tokens: 8192,
+        temperature: 0.1,
       },
-      max_tokens: 8192,
-      temperature: 0.2,
-    });
+    );
 
-    const response = parseAIJsonResponse(result);
+    let result = await aiRequest(system, user);
+    let response;
+
+    try {
+      response = parseAIJsonResponse(result);
+    } catch (firstError) {
+      const retrySystem = [
+        system,
+        '',
+        'IMPORTANT: A resposta anterior não pôde ser lida.',
+        'Gere novamente desde o início.',
+        'Devolva APENAS um JSON válido e completo.',
+        'Não uses markdown, comentários ou texto fora do JSON.',
+        'Mantém os textos curtos para garantir que todo o JSON termina corretamente.',
+        'Não uses aspas duplas dentro de valores de texto sem as escapar.',
+      ].join('\\n');
+
+      const retryUser = [
+        user,
+        '',
+        'RETRY: responde novamente com JSON completo, compacto e válido.',
+      ].join('\\n');
+
+      result = await aiRequest(retrySystem, retryUser);
+      try {
+        response = parseAIJsonResponse(result);
+      } catch {
+        throw firstError;
+      }
+    }
 
     await env.BOOKS_DB.prepare(
       `INSERT INTO ai_generations
