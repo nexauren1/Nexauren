@@ -835,12 +835,19 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       },
     );
 
-    const compactRule = [
-      'A saída deve ser completa e terminar correctamente.',
-      'Mantém cada campo textual curto e directo.',
-      'Não repitas informação em várias propriedades.',
-      'Não uses markdown nem texto fora do JSON.',
-    ].join(' ');
+    const compactRule = action === 'chapter'
+      ? [
+          'A saída deve ser JSON válido e completo.',
+          'O campo content é o manuscrito completo e NÃO deve ser resumido.',
+          'Não trunques, encurtes ou substituas content por uma sinopse.',
+          'Não uses markdown nem texto fora do JSON.',
+        ].join(' ')
+      : [
+          'A saída deve ser completa e terminar correctamente.',
+          'Mantém cada campo textual curto e directo.',
+          'Não repitas informação em várias propriedades.',
+          'Não uses markdown nem texto fora do JSON.',
+        ].join(' ');
 
     let result;
     let response;
@@ -904,16 +911,26 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
     }
 
     if (!response) {
-      const finalSystem = [
-        system,
-        '',
-        'ÚLTIMA TENTATIVA.',
-        'Responde com o JSON mínimo necessário para cumprir o schema.',
-        'Usa frases muito curtas.',
-        'Evita listas extensas.',
-        'Fecha todas as chaves e colchetes.',
-        'Não escrevas nada fora do JSON.',
-      ].join('\\n');
+      const finalSystem = action === 'chapter'
+        ? [
+            system,
+            '',
+            'ÚLTIMA TENTATIVA.',
+            'Gera o capítulo completo, não um resumo.',
+            'Cumpre o intervalo de palavras e fecha correctamente o JSON.',
+            'O campo content deve conter todo o manuscrito.',
+            'Não escrevas nada fora do JSON.',
+          ].join('\\n')
+        : [
+            system,
+            '',
+            'ÚLTIMA TENTATIVA.',
+            'Responde com o JSON mínimo necessário para cumprir o schema.',
+            'Usa frases muito curtas.',
+            'Evita listas extensas.',
+            'Fecha todas as chaves e colchetes.',
+            'Não escrevas nada fora do JSON.',
+          ].join('\\n');
 
       const finalTokens = action === 'chapter'
         ? 8500
