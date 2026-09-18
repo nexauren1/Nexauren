@@ -52,26 +52,11 @@ function wordCount(value) {
     .length;
 }
 
-function bibleValue(object, keys, fallback = '—') {
-  for (const key of keys) {
-    const value = object?.[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-    if (Number.isFinite(Number(value)) && String(value).trim()) return String(value);
-  }
-  return fallback;
-}
-
-function bibleList(value) {
-  return Array.isArray(value)
-    ? value.filter((item) => item && typeof item === 'object')
-    : [];
-}
-
-function renderBibleField(label, value) {
-  const text = bibleValue(value, [label]);
-  if (text === '—') return '';
-  return '<div class="bible-field"><span>' + escapeHtml(label.replace(/_/g, ' ')) +
-    '</span><p>' + escapeHtml(text) + '</p></div>';
+function bibleValue(value) {
+  if (value === undefined || value === null) return '';
+  if (Array.isArray(value)) return value.map(bibleValue).join(' · ');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value).trim();
 }
 
 function renderBibleDetail(bible) {
@@ -79,100 +64,63 @@ function renderBibleDetail(bible) {
     return '<p class="reader-empty">A Bíblia ainda não foi criada.</p>';
   }
 
-  const identity = bible.identity || {};
-  const story = bible.story || {};
-  const world = bible.world || {};
-  const style = bible.style || {};
-  const continuity = bible.continuity || {};
-  const continuation = bible.continuation || {};
-  const characters = bibleList(bible.characters);
-  const relations = bibleList(bible.relations);
-  const timeline = bibleList(bible.timeline);
+  const groups = [
+    ['Identidade', bible.identity],
+    ['História', bible.story],
+    ['Mundo', bible.world],
+    ['Estilo', bible.style],
+    ['Continuidade', bible.continuity],
+    ['Continuação', bible.continuation],
+  ];
 
-  const characterCards = characters.map((item, index) => {
-    const name = bibleValue(item, ['name', 'canonical_name', 'identity'], 'Personagem ' + (index + 1));
-    const lines = [
-      ['role', item.role],
-      ['wants', item.wants],
-      ['needs', item.needs],
-      ['flaw', item.flaw],
-      ['arc', item.arc],
-      ['knowledge', item.knowledge_boundaries || item.knowledge],
-    ].filter((entry) => entry[1]);
+  const body = groups.map(([title, value]) => {
+    if (!value || typeof value !== 'object') return '';
+    const rows = Object.entries(value)
+      .filter((entry) => bibleValue(entry[1]))
+      .slice(0, 16)
+      .map(([key, item]) =>
+        '<div class="bible-field"><span>' +
+        escapeHtml(key.replace(/_/g, ' ')) +
+        '</span><p>' +
+        escapeHtml(bibleValue(item)) +
+        '</p></div>',
+      )
+      .join('');
 
-    return '<article class="bible-char">' +
-      '<strong>' + escapeHtml(name) + '</strong>' +
-      (item.id ? '<span class="bible-pill">' + escapeHtml(item.id) + '</span>' : '') +
-      lines.map(([label, value]) =>
-        '<div><span>' + escapeHtml(label) + '</span><p>' +
-        escapeHtml(value) + '</p></div>',
-      ).join('') +
-      '</article>';
+    return rows
+      ? '<section class="bible-section"><h3>' +
+        escapeHtml(title) +
+        '</h3>' + rows + '</section>'
+      : '';
   }).join('');
 
-  const relationRows = relations.map((item) =>
-    '<div class="bible-row"><strong>' +
-    escapeHtml(bibleValue(item, ['type', 'relation'], 'Relação')) +
-    '</strong><p>' +
-    escapeHtml(
-      bibleValue(item, ['description', 'between', 'characters'], JSON.stringify(item)),
-    ) +
-    '</p></div>',
-  ).join('');
+  const characters = Array.isArray(bible.characters)
+    ? bible.characters
+    : [];
 
-  const timelineRows = timeline.map((item, index) =>
-    '<div class="bible-row"><strong>' +
-    escapeHtml(String(index + 1) + '. ' + bibleValue(
-      item,
-      ['event', 'milestone', 'title', 'name'],
-      'Marco temporal',
-    )) +
+  const cast = characters.map((item, index) =>
+    '<article class="bible-char"><strong>' +
+    escapeHtml(
+      item?.name ||
+      item?.canonical_name ||
+      ('Personagem ' + (index + 1)),
+    ) +
     '</strong><p>' +
     escapeHtml(
-      bibleValue(
-        item,
-        ['description', 'cause', 'consequence', 'result'],
-        '',
-      ),
+      bibleValue(item?.role) ||
+      bibleValue(item?.arc) ||
+      bibleValue(item?.wants),
     ) +
-    '</p></div>',
+    '</p></article>',
   ).join('');
 
   return '<div class="bible-detail">' +
-    '<section class="bible-section"><h3>Identidade</h3>' +
-      renderBibleField('title', identity) +
-      renderBibleField('genre', identity) +
-      renderBibleField('subgenre', identity) +
-      renderBibleField('logline', identity) +
-      renderBibleField('synopsis', identity) +
-    '</section>' +
-    '<section class="bible-section"><h3>História</h3>' +
-      ['premise', 'central_conflict', 'stakes', 'themes', 'beginning',
-        'inciting_incident', 'midpoint', 'climax', 'resolution',
-        'protagonist_arc'].map((key) => renderBibleField(key, story)).join('') +
-    '</section>' +
-    '<section class="bible-section"><h3>Personagens</h3>' +
-      (characterCards || '<p class="reader-empty">A IA não definiu personagens suficientes.</p>') +
-    '</section>' +
-    '<section class="bible-section"><h3>Relações</h3>' +
-      (relationRows || '<p class="reader-empty">Sem relações registadas.</p>') +
-    '</section>' +
-    '<section class="bible-section"><h3>Mundo</h3>' +
-      ['setting', 'time', 'culture', 'rules', 'limitations'].map((key) => renderBibleField(key, world)).join('') +
-    '</section>' +
-    '<section class="bible-section"><h3>Cronologia</h3>' +
-      (timelineRows || '<p class="reader-empty">Sem cronologia registada.</p>') +
-    '</section>' +
-    '<section class="bible-section"><h3>Estilo</h3>' +
-      ['pov', 'tense', 'voice', 'tone', 'pacing', 'dialogue'].map((key) => renderBibleField(key, style)).join('') +
-    '</section>' +
-    '<section class="bible-section"><h3>Continuidade</h3>' +
-      ['immutable_facts', 'must_not_change', 'unresolved_threads'].map((key) => renderBibleField(key, continuity)).join('') +
-    '</section>' +
-    '<section class="bible-section"><h3>Continuação</h3>' +
-      ['ending', 'future_threads', 'series_threads'].map((key) => renderBibleField(key, continuation)).join('') +
-    '</section>' +
-  '</div>';
+    body +
+    (cast
+      ? '<section class="bible-section"><h3>Personagens</h3>' +
+        cast + '</section>'
+      : '') +
+    '</div>';
 }
 
 function setGlobal(message, kind = '') {
@@ -459,8 +407,7 @@ function renderPrepare() {
   $('bible-approve').disabled = state.busy || !bibleReady || bibleLocked;
   const writtenCount = currentChapters(book).length;
   const canCreateStructure = bibleLocked && writtenCount === 0;
-  $('book-structure').disabled =
-    state.busy || !canCreateStructure;
+  $('book-structure').disabled = state.busy || !canCreateStructure;
   $('book-structure').textContent =
     structureReady && writtenCount === 0
       ? 'Regenerar estrutura'
@@ -479,10 +426,17 @@ function renderPrepare() {
     : '<p class="reader-empty">A Bíblia ainda não foi criada.</p>';
 
   $('bible-view').innerHTML = bible
-    ? '<strong>' + (bibleLocked ? 'Bíblia Oficial bloqueada.' : 'Bíblia Oficial por aprovar.') + '</strong>' +
-      '<p>' + countText(bible.characters?.length || 0) + ' personagens · ' +
-      countText(bible.timeline?.length || 0) + ' marcos temporais · ' +
-      countText(bible.relations?.length || 0) + ' relações</p>' +
+    ? '<strong>' +
+      (bibleLocked
+        ? 'Bíblia Oficial bloqueada.'
+        : 'Bíblia Oficial por aprovar.') +
+      '</strong><p>' +
+      countText(bible.characters?.length || 0) +
+      ' personagens · ' +
+      countText(bible.timeline?.length || 0) +
+      ' marcos · ' +
+      countText(bible.relations?.length || 0) +
+      ' relações</p>' +
       renderBibleDetail(bible)
     : '<p class="reader-empty">Ainda não existe uma Bíblia Oficial.</p>';
 
@@ -501,25 +455,27 @@ function renderPrepare() {
 }
 
 function structureItem(item, index) {
-  const details = [
-    ['Papel no arco', item.arc_role],
+  const fields = [
+    ['Papel', item.arc_role],
     ['Objectivo', item.objective],
-    ['Personagens', Array.isArray(item.characters) ? item.characters.join(', ') : item.characters],
+    ['Personagens', Array.isArray(item.characters)
+      ? item.characters.join(', ')
+      : item.characters],
     ['Local', item.location],
     ['Conflito', item.conflict],
     ['Viragem', item.turning_point],
     ['Resultado', item.result],
-    ['Causa seguinte', item.cause_forward],
+    ['Próxima causa', item.cause_forward],
   ].filter((entry) => entry[1]);
 
-  return '<div class="structure-row">'
-    + '<span>' + escapeHtml(item.number || String(index + 1)) + '</span>'
-    + '<div><strong>' + escapeHtml(item.title || 'Sem título') + '</strong>'
-    + details.map(([label, value]) =>
-      '<p><b>' + escapeHtml(label) + ':</b> ' +
-      escapeHtml(value) + '</p>',
-    ).join('')
-    + '</div></div>';
+  return '<div class="structure-row">' +
+    '<span>' + escapeHtml(item.number || String(index + 1)) + '</span>' +
+    '<div><strong>' + escapeHtml(item.title || 'Sem título') + '</strong>' +
+    fields.map((entry) =>
+      '<p><b>' + escapeHtml(entry[0]) + ':</b> ' +
+      escapeHtml(entry[1]) + '</p>',
+    ).join('') +
+    '</div></div>';
 }
 
 function renderWriting() {
@@ -540,26 +496,43 @@ function renderWriting() {
 
   const chapters = currentChapters(book);
   const next = nextChapterNumber();
+
   writeButton.disabled = !next || state.busy;
   writeButton.textContent = next
     ? 'Escrever capítulo ' + next
     : 'Livro completo';
-  $('chapter-count').textContent = countText(structure.chapters.length) + ' capítulos';
+
+  $('chapter-count').textContent =
+    countText(structure.chapters.length) + ' capítulos';
 
   const rows = structure.chapters.map((chapter) => {
     const number = Number(chapter.number);
-    const existing = chapters.find((item) => Number(item.chapter_number) === number);
+    const existing = chapters.find(
+      (item) => Number(item.chapter_number) === number,
+    );
     const active = state.selectedChapter?.id === existing?.id && existing;
     const isNext = number === next;
-    const actionText = existing ? 'Abrir' : isNext ? 'Escrever' : 'Bloqueado';
-    const disabled = !existing && !isNext ? ' disabled' : '';
-    return '<button class="plan-row ' + (active ? 'active' : '') +
-      (disabled ? ' locked' : '') + '" type="button" data-chapter-plan="' + number + '"' + disabled + '>'
-      + '<span class="plan-number">' + escapeHtml(number) + '</span>'
-      + '<span class="plan-main"><strong>' + escapeHtml(chapter.title || 'Sem título') + '</strong>'
-      + '<small>' + escapeHtml(chapter.objective || 'Plano ainda sem objectivo.') + '</small></span>'
-      + '<span class="plan-state">' + actionText + '</span>'
-      + '</button>';
+    const actionText = existing
+      ? 'Abrir'
+      : isNext
+        ? 'Escrever'
+        : 'Bloqueado';
+    const disabled =
+      !existing && !isNext ? ' disabled' : '';
+
+    return '<button class="plan-row ' +
+      (active ? 'active' : '') +
+      (disabled ? ' locked' : '') +
+      '" type="button" data-chapter-plan="' +
+      number + '"' + disabled + '>' +
+      '<span class="plan-number">' +
+      escapeHtml(number) + '</span>' +
+      '<span class="plan-main"><strong>' +
+      escapeHtml(chapter.title || 'Sem título') +
+      '</strong><small>' +
+      escapeHtml(chapter.objective || 'Plano ainda sem objectivo.') +
+      '</small></span><span class="plan-state">' +
+      actionText + '</span></button>';
   }).join('');
 
   $('chapter-plan').innerHTML = rows || '<p class="reader-empty">Sem capítulos planeados.</p>';
@@ -593,8 +566,8 @@ function renderWriting() {
   const creation = book.book_metadata?.creation || {};
   $('selected-chapter-meta').textContent = chapter
     ? 'versão ' + (chapter.version_number ?? '—') +
-      ' · ' + countText(wordCount(chapter.content)) + ' palavras' +
-      ' · alvo ' + (creation.chapter_size || '—')
+      ' · ' + countText(wordCount(chapter.content)) +
+      ' palavras · alvo ' + (creation.chapter_size || '—')
     : '—';
 
   const paragraphs = String(chapter?.content || '')
@@ -623,9 +596,9 @@ function renderWriting() {
 
 function renderReview() {
   $('review-all').disabled =
-    !state.currentBook
-    || state.busy
-    || currentChapters(state.currentBook).length === 0;
+    !state.currentBook ||
+    state.busy ||
+    currentChapters(state.currentBook).length === 0;
   if (!state.currentBook) {
     ['continuity-view', 'qa-view', 'originality-view'].forEach((id) => {
       $(id).innerHTML = '<p class="reader-empty">Selecciona um livro.</p>';
@@ -660,52 +633,66 @@ async function loadFiles() {
   if (!state.currentBook) return;
 
   const data = await api(
-    '/api/admin/files?book_id='
-    + encodeURIComponent(state.currentBook.id),
+    '/api/admin/files?book_id=' +
+    encodeURIComponent(state.currentBook.id),
   );
 
   const canOpen = state.currentBook.status === 'published';
-  const adminPdf = '/api/admin/files/download?book_id='
-    + encodeURIComponent(state.currentBook.id)
-    + '&format=pdf';
-  const publicPdf = '/api/books/'
-    + encodeURIComponent(state.currentBook.slug)
-    + '/download?format=pdf';
-  const publicEpub = '/api/books/'
-    + encodeURIComponent(state.currentBook.slug)
-    + '/download?format=epub';
+  const publicPdf = '/api/books/' +
+    encodeURIComponent(state.currentBook.slug) +
+    '/download?format=pdf';
+  const publicEpub = '/api/books/' +
+    encodeURIComponent(state.currentBook.slug) +
+    '/download?format=epub';
 
   const problems = [
     ...(data.missing_chapters || []).map(
       (number) => 'Capítulo ' + number + ' em falta',
     ),
     ...(data.invalid_chapters || []).map(
-      (number) => 'Capítulo ' + number + ' fora do tamanho definido',
+      (number) => 'Capítulo ' + number +
+        ' fora do tamanho definido',
     ),
   ];
 
+  const pdfButton = $('pdf-generate');
+  if (pdfButton) {
+    pdfButton.disabled =
+      !data.can_generate_pdf || state.busy;
+    pdfButton.dataset.pdfUrl =
+      data.can_generate_pdf
+        ? '/api/admin/files/download?book_id=' +
+          encodeURIComponent(state.currentBook.id) +
+          '&format=pdf'
+        : '';
+  }
+
   $('files-view').innerHTML = ''
-    + '<strong>' + countText(data.chapters) + ' de ' +
-      countText(data.planned_chapters) + ' capítulos</strong>'
-    + '<p>' + countText(data.word_count) + ' palavras no manuscrito · alvo por capítulo: ' +
+    + '<strong>' + countText(data.chapters) +
+      ' de ' + countText(data.planned_chapters) +
+      ' capítulos</strong>'
+    + '<p>' + countText(data.word_count) +
+      ' palavras no manuscrito · alvo por capítulo: ' +
       escapeHtml(data.target_range || '—') + '</p>'
     + (problems.length
       ? '<div class="file-state error"><strong>O livro ainda não está pronto</strong><p>' +
-        problems.map(escapeHtml).join(' · ') + '</p></div>'
+        problems.map(escapeHtml).join(' · ') +
+        '</p></div>'
       : '<div class="file-state success"><strong>Manuscrito completo e validado.</strong><p>' +
-        escapeHtml(data.note || '') + '</p></div>')
-    + '<div class="file-links">'
-    + (data.can_generate_pdf
-      ? '<a class="button button-primary" href="' + adminPdf + '">Gerar PDF</a>'
-      : '')
+        escapeHtml(data.note || '') +
+        '</p></div>')
     + (canOpen
-      ? '<a class="button" href="' + publicPdf + '">Abrir PDF público</a>' +
-        '<a class="button" href="' + publicEpub + '">Abrir EPUB público</a>'
+      ? '<div class="file-links">' +
+        '<a class="button" href="' + publicPdf +
+        '">Abrir PDF público</a>' +
+        '<a class="button" href="' + publicEpub +
+        '">Abrir EPUB público</a>' +
+        '</div>'
       : '')
-    + '</div>'
     + (!data.can_generate_pdf
       ? '<p class="small-muted">Escreve e valida todos os capítulos para activar a geração do PDF.</p>'
       : '');
+}
 
 async function loadCovers() {
   if (!state.currentBook) return;
@@ -911,9 +898,13 @@ function nextChapterNumber() {
   const plan = bookStructure(state.currentBook).chapters
     .map((item) => Number(item.number))
     .filter(Boolean);
-  const existing = new Set(currentChapters(state.currentBook).map(
-    (item) => Number(item.chapter_number),
-  ));
+
+  const existing = new Set(
+    currentChapters(state.currentBook).map(
+      (item) => Number(item.chapter_number),
+    ),
+  );
+
   return plan.find((number) => !existing.has(number)) || null;
 }
 
@@ -1217,6 +1208,10 @@ $('write-next')?.addEventListener('click', () => writeChapter(nextChapterNumber(
 $('review-all')?.addEventListener('click', reviewBook);
 $('cover-generate')?.addEventListener('click', generateCover);
 $('seo-generate')?.addEventListener('click', generateSeo);
+$('pdf-generate')?.addEventListener('click', () => {
+  const url = $('pdf-generate')?.dataset.pdfUrl;
+  if (url) window.location.href = url;
+});
 $('save-publication')?.addEventListener('click', savePublication);
 
 document.querySelectorAll('.status-button').forEach((button) => {
