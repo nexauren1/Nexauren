@@ -346,10 +346,6 @@ function renderPrepare() {
         : 'Aprova a Bíblia antes de criar a estrutura.') +
       '</p>';
 
-  const publication = book.book_metadata?.publication || {};
-  if (publication.author && $('prepare-book-meta')) {
-    // O resumo já mostra os dados de criação; publicação fica na etapa final.
-  }
 }
 
 function structureItem(item, index) {
