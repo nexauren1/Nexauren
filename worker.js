@@ -952,14 +952,25 @@ function validateAIResponse(action, response, qualityContext = null) {
     if (!Number.isInteger(plannedCount) || plannedCount !== sorted.length) {
       throw new Error('A contagem de capítulos do plano não corresponde ao índice.');
     }
+    for (const key of ['estimated_word_count', 'pacing_strategy', 'ending_strategy']) {
+      if (!nonEmptyText(String(response.book_plan[key] || ''), 3)) {
+        throw new Error('O plano editorial está incompleto no campo ' + key + '.');
+      }
+    }
     const characterNames = bibleCharacterNames(qualityContext || {});
     const locationNames = bibleLocationNames(qualityContext || {});
+    const chapterTitles = new Set();
     for (const item of response.chapters) {
       for (const key of ['title', 'arc_role', 'objective', 'location', 'conflict', 'turning_point', 'result', 'cause_forward']) {
         if (!nonEmptyText(item?.[key], 6)) {
           throw new Error('O capítulo ' + item.number + ' contém o campo ' + key + ' vazio ou genérico.');
         }
       }
+      const titleKey = String(item.title).trim().toLowerCase();
+      if (chapterTitles.has(titleKey)) {
+        throw new Error('A estrutura contém títulos de capítulos duplicados.');
+      }
+      chapterTitles.add(titleKey);
       if (!Array.isArray(item.characters) || !item.characters.length) {
         throw new Error('O capítulo ' + item.number + ' precisa de personagens definidos no plano.');
       }
