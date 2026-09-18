@@ -561,6 +561,10 @@ function renderPrepare() {
       : 'Criada · por aprovar';
 
   $('bible-generate').disabled = state.busy || bibleLocked;
+  $('bible-generate').textContent =
+    bibleReady && !bibleLocked
+      ? 'Regenerar Bíblia Oficial'
+      : 'Criar Bíblia Oficial';
   $('bible-approve').disabled = state.busy || !bibleReady || bibleLocked;
   const writtenCount = currentChapters(book).length;
   const canCreateStructure = bibleLocked && writtenCount === 0;
@@ -579,7 +583,11 @@ function renderPrepare() {
       '<div class="result-line"><strong>Conteúdo</strong><p>' +
       countText((bible.characters || []).length) + ' personagens · ' +
       countText((bible.timeline || []).length) + ' pontos de cronologia · ' +
-      countText((bible.relations || []).length) + ' relações</p></div>'
+      countText((bible.relations || []).length) + ' relações' +
+      (bible.identity?.editorial_scope?.scale
+        ? ' · escala ' + escapeHtml(bible.identity.editorial_scope.scale)
+        : '') +
+      '</p></div>'
     : '<p class="reader-empty">A Bíblia ainda não foi criada.</p>';
 
   $('bible-view').innerHTML = bible
