@@ -622,6 +622,59 @@ select:focus, input:focus, textarea:focus {
   margin-top: 12px;
 }
 
+.bible-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+.bible-scope-card {
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.bible-scope-card strong {
+  font-size: .9rem;
+  color: var(--accent-dark);
+}
+.bible-scope-card span {
+  color: var(--muted);
+  font-size: .55rem;
+  line-height: 1.25;
+}
+.bible-list {
+  display: grid;
+  gap: 6px;
+}
+.bible-field .bible-field {
+  margin-top: 7px;
+  margin-left: 9px;
+  padding-left: 9px;
+  border-left: 2px solid #ebe6de;
+}
+.bible-row b {
+  color: var(--accent-dark);
+}
+.bible-char-detail {
+  gap: 7px;
+}
+.bible-char-detail + .bible-char-detail {
+  margin-top: 8px;
+}
+.bible-char-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.bible-char-detail > small {
+  color: var(--muted);
+  font-size: .54rem;
+}
+
 .bible-section {
   padding: 12px;
   border: 1px solid var(--line);
