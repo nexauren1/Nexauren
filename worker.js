@@ -1342,6 +1342,35 @@ async function adminApi(request, env) {
       createdAt,
     ).run();
 
+    await env.BOOKS_DB.prepare(
+      `INSERT INTO book_metadata
+        (book_id, metadata_json, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(book_id) DO UPDATE SET
+         metadata_json = excluded.metadata_json,
+         updated_at = excluded.updated_at`,
+    ).bind(
+      id,
+      JSON.stringify({
+        creation: {
+          series_name: seriesName,
+          series_size: seriesSize,
+          chapter_size: chapterSize,
+        },
+        publication: {
+          author: String(body?.author || 'Nexauren').trim() || 'Nexauren',
+          language: String(body?.language || 'pt-PT').trim() || 'pt-PT',
+          audience: String(body?.audience || '').trim(),
+          age_rating: String(body?.age_rating || '').trim(),
+          price_usd: price,
+          currency: 'USD',
+          pdf: true,
+          epub: true,
+        },
+      }),
+      createdAt,
+    ).run();
+
     return json({ ok: true, id, slug }, 201);
   }
 
