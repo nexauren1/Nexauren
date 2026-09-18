@@ -999,6 +999,7 @@ select:focus, input:focus, textarea:focus {
 .footer { padding-bottom: 28px; color: var(--muted); font-size: .6rem; }
 @media (max-width: 1020px) {
   .layout { grid-template-columns: 1fr; }
+  .bible-scope-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sidebar { position: static; }
   .main-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .nav-item { min-height: 42px; }
@@ -1006,6 +1007,7 @@ select:focus, input:focus, textarea:focus {
 }
 @media (max-width: 720px) {
   .shell { width: min(100% - 16px, 1360px); }
+  .bible-scope-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .topbar-inner { min-height: 66px; }
   .topbar-actions .ai-status, .topbar-actions .user-chip { display: none; }
   .mobile-book { display: grid; gap: 6px; margin-bottom: 10px; }
@@ -1021,6 +1023,7 @@ select:focus, input:focus, textarea:focus {
 }
 @media (max-width: 430px) {
   .flow { grid-template-columns: 1fr; }
+  .bible-scope-grid { grid-template-columns: 1fr 1fr; }
   .cover-grid { grid-template-columns: 1fr; }
   .topbar-inner { align-items: center; }
   .brand-text strong { font-size: .66rem; }
