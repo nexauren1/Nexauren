@@ -627,6 +627,71 @@ function parseAIJsonResponse(result) {
   );
 }
 
+function validateAIResponse(action, response) {
+  if (!response || typeof response !== 'object') {
+    throw new Error('A resposta da IA está vazia ou malformada.');
+  }
+
+  if (action === 'story_bible') {
+    const requiredObjects = [
+      'identity',
+      'story',
+      'world',
+      'style',
+      'continuity',
+      'continuation',
+    ];
+    const missing = requiredObjects.filter(
+      (key) => !response[key]
+        || typeof response[key] !== 'object',
+    );
+
+    if (
+      missing.length
+      || !Array.isArray(response.characters)
+      || !Array.isArray(response.relations)
+      || !Array.isArray(response.timeline)
+    ) {
+      throw new Error('A Bíblia Oficial recebida está incompleta.');
+    }
+  }
+
+  if (action === 'structure' || action === 'outline') {
+    if (
+      !Array.isArray(response.chapters)
+      || !response.chapters.length
+    ) {
+      throw new Error('A estrutura recebida não contém capítulos.');
+    }
+
+    const numbers = response.chapters
+      .map((item) => Number(item?.number))
+      .filter(Number.isInteger);
+
+    if (
+      numbers.length !== response.chapters.length
+      || new Set(numbers).size !== numbers.length
+    ) {
+      throw new Error(
+        'A estrutura recebida contém capítulos inválidos.',
+      );
+    }
+  }
+
+  if (action === 'chapter') {
+    if (
+      typeof response.title !== 'string'
+      || !response.title.trim()
+      || typeof response.content !== 'string'
+      || !response.content.trim()
+    ) {
+      throw new Error('O capítulo recebido está incompleto.');
+    }
+  }
+
+  return response;
+}
+
 function friendlyAIError(error) {
   const message = String(error?.message || error || '').trim();
 
@@ -705,7 +770,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         true,
         8000,
       );
-      response = parseAIJsonResponse(result);
+      response = validateAIResponse(
+        action,
+        parseAIJsonResponse(result),
+      );
     } catch (error) {
       firstError = error;
     }
@@ -726,14 +794,19 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         'RETRY: JSON compacto, completo e válido.',
       ].join('\\n');
 
+      const retryTokens = action === 'chapter' ? 8000 : 7000;
+
       try {
         result = await aiRequest(
           retrySystem,
           retryUser,
           false,
-          7000,
+          retryTokens,
         );
-        response = parseAIJsonResponse(result);
+        response = validateAIResponse(
+          action,
+          parseAIJsonResponse(result),
+        );
       } catch (secondError) {
         firstError = secondError || firstError;
       }
@@ -751,14 +824,19 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         'Não escrevas nada fora do JSON.',
       ].join('\\n');
 
+      const finalTokens = action === 'chapter' ? 7000 : 5000;
+
       try {
         result = await aiRequest(
           finalSystem,
           [user, 'Resposta mínima e completa.'].join('\\n\\n'),
           false,
-          5000,
+          finalTokens,
         );
-        response = parseAIJsonResponse(result);
+        response = validateAIResponse(
+          action,
+          parseAIJsonResponse(result),
+        );
       } catch (thirdError) {
         throw friendlyAIError(thirdError || firstError);
       }
@@ -1119,7 +1197,7 @@ async function adminAI(request, env, admin) {
       action,
       bookId,
       `You are the NexaurenBooks Writer. Write exactly one chapter in ${language}. The chapter title is fixed by the approved structure and must not be changed. The Story Bible, locked canonical facts and current Story State are authoritative. Follow the approved chapter plan. Do not change names, ages, relationships, world rules, chronology or knowledge states. Do not add a different chapter number. Return only JSON matching the schema. The content field must contain the chapter prose only; do not repeat the title inside content.`,
-      `Language: ${language}\n\nFixed chapter number: ${chapterNumber}\nFixed chapter title: ${requestedTitle}\nTarget chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}\n\nStory Bible:\n${clip(context.story_bible, 26000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 12000)}\n\nStory State:\n${clip(context.story_state || {}, 12000)}\n\nRelevant previous chapters:\n${clip(previous, 18000)}\n\nApproved chapter plan:\n${clip(requestedOutline, 9000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 10000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber} now.`,
+      `Language: ${language}\n\nFixed chapter number: ${chapterNumber}\nFixed chapter title: ${requestedTitle}\nTarget chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}\n\nStory Bible:\n${clip(context.story_bible, 16000)}\n\nCanonical facts:\n${clip(context.canonical_facts, 6000)}\n\nStory State:\n${clip(context.story_state || {}, 6000)}\n\nRelevant previous chapters:\n${clip(previous, 8000)}\n\nApproved chapter plan:\n${clip(requestedOutline, 6000)}\n\nExisting current version (regeneration target):\n${clip(currentChapter || {}, 5000)}\n\nAdmin instructions:\n${instructions}\n\nGenerate chapter ${chapterNumber} now.`,
       CHAPTER_SCHEMA,
       admin.user_id,
     );
