@@ -407,10 +407,24 @@ const STORY_BIBLE_SCHEMA = {
   properties: {
     identity: { type: 'object', additionalProperties: true },
     story: { type: 'object', additionalProperties: true },
-    characters: { type: 'array', items: { type: 'object', additionalProperties: true } },
-    relations: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    characters: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 100,
+      items: { type: 'object', additionalProperties: true },
+    },
+    relations: {
+      type: 'array',
+      maxItems: 300,
+      items: { type: 'object', additionalProperties: true },
+    },
     world: { type: 'object', additionalProperties: true },
-    timeline: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    timeline: {
+      type: 'array',
+      minItems: 5,
+      maxItems: 80,
+      items: { type: 'object', additionalProperties: true },
+    },
     style: { type: 'object', additionalProperties: true },
     continuity: { type: 'object', additionalProperties: true },
     continuation: { type: 'object', additionalProperties: true },
@@ -424,6 +438,7 @@ const STORY_BIBLE_SCHEMA = {
 const OUTLINE_SCHEMA = {
   type: 'object',
   properties: {
+    book_plan: { type: 'object', additionalProperties: true },
     front_matter: {
       type: 'array',
       items: {
@@ -440,6 +455,8 @@ const OUTLINE_SCHEMA = {
     },
     chapters: {
       type: 'array',
+      minItems: 6,
+      maxItems: 40,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -453,7 +470,11 @@ const OUTLINE_SCHEMA = {
           title: { type: 'string' },
           arc_role: { type: 'string' },
           objective: { type: 'string' },
-          characters: { type: 'array', items: { type: 'string' } },
+          characters: {
+            type: 'array',
+            minItems: 1,
+            items: { type: 'string' },
+          },
           location: { type: 'string' },
           conflict: { type: 'string' },
           turning_point: { type: 'string' },
@@ -477,7 +498,7 @@ const OUTLINE_SCHEMA = {
       },
     },
   },
-  required: ['front_matter', 'chapters', 'back_matter'],
+  required: ['book_plan', 'front_matter', 'chapters', 'back_matter'],
 };
 
 const CHAPTER_SCHEMA = {
@@ -706,71 +727,235 @@ function chapterManuscriptIssues(contentValue, range) {
   return { words, paragraphs: paragraphs.length, issues };
 }
 
+function genericBibleText(value) {
+  const text = String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (!text) return true;
+  const generic = new Set([
+    'personagem 1', 'personagem 2', 'personagem 3',
+    'personagem', 'protagonista', 'conclusao do projeto',
+    'introducao ao protagonista', 'desenvolvimento do projeto',
+    'cultura ocidental', 'leis da fisica',
+    'nova ideia para um projeto', 'presente', 'standalone',
+    'recursos limitados',
+  ]);
+  return generic.has(text)
+    || /^personagem\s+\d+$/.test(text)
+    || /^local\s*\d*$/i.test(text);
+}
+
+function nonEmptyText(value, minimum = 4) {
+  return typeof value === 'string'
+    && value.trim().length >= minimum
+    && !genericBibleText(value);
+}
+
+function bibleCharacterNames(bible) {
+  return new Set(
+    (Array.isArray(bible?.characters) ? bible.characters : [])
+      .flatMap((item) => [
+        item?.id,
+        item?.name,
+        item?.canonical_name,
+        ...(Array.isArray(item?.aliases) ? item.aliases : []),
+      ])
+      .filter((item) => String(item || '').trim())
+      .map((item) => String(item).trim().toLowerCase()),
+  );
+}
+
+function validateStoryBibleQuality(bible) {
+  const problems = [];
+  const identity = bible.identity || {};
+  const story = bible.story || {};
+  const world = bible.world || {};
+  const style = bible.style || {};
+  const continuity = bible.continuity || {};
+  const continuation = bible.continuation || {};
+  const characters = Array.isArray(bible.characters) ? bible.characters : [];
+  const relations = Array.isArray(bible.relations) ? bible.relations : [];
+  const timeline = Array.isArray(bible.timeline) ? bible.timeline : [];
+
+  const requiredText = [
+    ['identity.title', identity.title],
+    ['identity.genre', identity.genre],
+    ['identity.logline', identity.logline],
+    ['identity.synopsis', identity.synopsis],
+    ['story.central_conflict', story.central_conflict],
+    ['story.protagonist_goal', story.protagonist_goal],
+    ['story.stakes', story.stakes],
+    ['story.inciting_incident', story.inciting_incident],
+    ['story.midpoint', story.midpoint],
+    ['story.climax', story.climax],
+    ['story.resolution', story.resolution],
+    ['story.protagonist_arc', story.protagonist_arc],
+    ['world.setting', world.setting],
+    ['world.rules', world.rules],
+    ['world.limitations', world.limitations],
+    ['style.pov', style.pov],
+    ['style.tense', style.tense],
+    ['style.voice', style.voice],
+    ['style.tone', style.tone],
+    ['continuity.must_not_change', continuity.must_not_change],
+    ['continuity.knowledge_boundaries', continuity.knowledge_boundaries],
+    ['continuation.ending', continuation.ending],
+  ];
+  for (const [label, value] of requiredText) {
+    if (!nonEmptyText(value)) {
+      problems.push(label + ' está vazio, genérico ou insuficientemente específico');
+    }
+  }
+
+  const scope = identity.editorial_scope || identity.planning_targets;
+  if (!scope || typeof scope !== 'object') {
+    problems.push('identity.editorial_scope em falta');
+  } else {
+    const ranges = [
+      ['character_count_target', 1, 100],
+      ['relation_count_target', 0, 300],
+      ['location_count_target', 1, 50],
+      ['timeline_milestone_target', 5, 80],
+      ['plot_thread_target', 1, 30],
+    ];
+    for (const [key, min, max] of ranges) {
+      const value = Number(scope[key]);
+      if (!Number.isInteger(value) || value < min || value > max) {
+        problems.push('editorial_scope.' + key + ' inválido');
+      }
+    }
+  }
+
+  if (characters.length < 1 || characters.length > 100) {
+    problems.push('o elenco deve conter entre 1 e 100 personagens');
+  }
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index];
+    const prefix = 'characters[' + index + ']';
+    if (!nonEmptyText(character?.id, 2)) problems.push(prefix + '.id inválido');
+    if (!nonEmptyText(character?.name, 2)
+      || /^personagem\s+\d+$/i.test(String(character?.name || ''))) {
+      problems.push(prefix + '.name inválido ou placeholder');
+    }
+    for (const key of ['role', 'wants', 'needs', 'fears', 'flaws', 'strengths', 'arc']) {
+      if (!nonEmptyText(character?.[key], 4)) {
+        problems.push(prefix + '.' + key + ' está vazio ou genérico');
+      }
+    }
+  }
+
+  if (timeline.length < 5 || timeline.length > 80) {
+    problems.push('a cronologia deve ter entre 5 e 80 marcos');
+  }
+  for (let index = 0; index < timeline.length; index += 1) {
+    const event = timeline[index];
+    for (const key of ['event', 'cause', 'consequence']) {
+      if (!nonEmptyText(event?.[key], 5)) {
+        problems.push('timeline[' + index + '].' + key + ' está vazio');
+      }
+    }
+  }
+
+  const names = bibleCharacterNames(bible);
+  for (let index = 0; index < relations.length; index += 1) {
+    const relation = relations[index];
+    const from = String(relation?.from_character_id || relation?.from || '')
+      .trim().toLowerCase();
+    const to = String(relation?.to_character_id || relation?.to || '')
+      .trim().toLowerCase();
+    if (from && !names.has(from)) problems.push('relations[' + index + '] referencia personagem inexistente');
+    if (to && !names.has(to)) problems.push('relations[' + index + '] referencia personagem inexistente');
+  }
+
+  const genre = String(identity.genre || '').toLowerCase();
+  if (/ficcao cientifica|sci[- ]?fi/.test(genre)) {
+    const speculative = world.technology || world.speculative_element || world.phenomenon;
+    if (!nonEmptyText(speculative, 8)) {
+      problems.push('a ficção científica precisa de um elemento especulativo concreto');
+    }
+  }
+
+  const storyText = JSON.stringify(story).toLowerCase();
+  if (storyText.includes('conclusão do projeto')
+    || storyText.includes('superar fracassos e criar algo grande')) {
+    problems.push('a Bíblia contém formulações genéricas em vez de decisões narrativas concretas');
+  }
+  return problems;
+}
+
 function validateAIResponse(action, response) {
   if (!response || typeof response !== 'object') {
     throw new Error('A resposta da IA está vazia ou malformada.');
   }
 
   if (action === 'story_bible') {
-    const requiredObjects = [
-      'identity',
-      'story',
-      'world',
-      'style',
-      'continuity',
-      'continuation',
-    ];
-    const missing = requiredObjects.filter(
-      (key) => !response[key]
-        || typeof response[key] !== 'object',
-    );
-
-    if (
-      missing.length
+    const requiredObjects = ['identity', 'story', 'world', 'style', 'continuity', 'continuation'];
+    const missing = requiredObjects.filter((key) => !response[key]
+      || typeof response[key] !== 'object');
+    if (missing.length
       || !Array.isArray(response.characters)
       || !Array.isArray(response.relations)
-      || !Array.isArray(response.timeline)
-    ) {
+      || !Array.isArray(response.timeline)) {
       throw new Error('A Bíblia Oficial recebida está incompleta.');
+    }
+    const problems = validateStoryBibleQuality(response);
+    if (problems.length) {
+      throw new Error('A Bíblia Oficial não passou no controlo editorial. ' + problems.slice(0, 6).join(' · '));
     }
   }
 
   if (action === 'structure' || action === 'outline') {
-    if (
-      !Array.isArray(response.chapters)
-      || !response.chapters.length
-    ) {
+    if (!Array.isArray(response.chapters) || !response.chapters.length) {
       throw new Error('A estrutura recebida não contém capítulos.');
     }
-
-    const numbers = response.chapters
-      .map((item) => Number(item?.number))
-      .filter(Number.isInteger);
-
-    if (
-      numbers.length !== response.chapters.length
-      || new Set(numbers).size !== numbers.length
-    ) {
-      throw new Error(
-        'A estrutura recebida contém capítulos inválidos.',
-      );
+    const numbers = response.chapters.map((item) => Number(item?.number));
+    if (numbers.some((number) => !Number.isInteger(number))
+      || new Set(numbers).size !== numbers.length) {
+      throw new Error('A estrutura recebida contém capítulos inválidos.');
+    }
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const contiguous = sorted.every((number, index) => number === index + 1);
+    if (!contiguous || sorted.length < 6 || sorted.length > 40) {
+      throw new Error('A estrutura deve conter capítulos consecutivos do 1 até ao último capítulo.');
+    }
+    const characterNames = bibleCharacterNames(response.story_bible || {});
+    for (const item of response.chapters) {
+      for (const key of ['title', 'arc_role', 'objective', 'location', 'conflict', 'turning_point', 'result', 'cause_forward']) {
+        if (!nonEmptyText(item?.[key], 6)) {
+          throw new Error('O capítulo ' + item.number + ' contém o campo ' + key + ' vazio ou genérico.');
+        }
+      }
+      if (!Array.isArray(item.characters) || !item.characters.length) {
+        throw new Error('O capítulo ' + item.number + ' precisa de personagens definidos no plano.');
+      }
+      if (characterNames.size) {
+        for (const name of item.characters) {
+          if (!characterNames.has(String(name).trim().toLowerCase())) {
+            throw new Error('O capítulo ' + item.number + ' referencia uma personagem que não existe na Bíblia.');
+          }
+        }
+      }
+    }
+    if (!response.book_plan || typeof response.book_plan !== 'object') {
+      throw new Error('A estrutura não definiu o plano editorial do livro.');
+    }
+    const plannedCount = Number(response.book_plan.chapter_count);
+    if (plannedCount !== sorted.length) {
+      throw new Error('A contagem de capítulos do plano não corresponde ao índice.');
     }
   }
 
   if (action === 'chapter') {
-    if (
-      typeof response.title !== 'string'
-      || !response.title.trim()
-      || typeof response.content !== 'string'
-      || !response.content.trim()
-    ) {
+    if (typeof response.title !== 'string' || !response.title.trim()
+      || typeof response.content !== 'string' || !response.content.trim()) {
       throw new Error('O capítulo recebido está incompleto.');
     }
   }
 
   return response;
 }
-
 function friendlyAIError(error) {
   const message = String(error?.message || error || '').trim();
 
@@ -1052,6 +1237,10 @@ async function saveStoryBible(env, bookId, bible, locked = false) {
 
 async function saveOutline(env, bookId, outline) {
   const structure = {
+    book_plan: outline.book_plan
+      && typeof outline.book_plan === 'object'
+      ? outline.book_plan
+      : {},
     front_matter: Array.isArray(outline.front_matter)
       ? outline.front_matter : [],
     chapters: Array.isArray(outline.chapters)
