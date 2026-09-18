@@ -736,7 +736,7 @@ function genericBibleText(value) {
   if (!text) return true;
   const generic = new Set([
     'personagem 1', 'personagem 2', 'personagem 3',
-    'personagem', 'protagonista', 'conclusao do projeto',
+    'personagem', 'conclusao do projeto',
     'introducao ao protagonista', 'desenvolvimento do projeto',
     'cultura ocidental', 'leis da fisica',
     'nova ideia para um projeto', 'presente', 'standalone',
@@ -976,7 +976,7 @@ function friendlyAIError(error) {
   );
 }
 
-async function runAIJson(env, action, bookId, system, user, schema, adminId) {
+async function runAIJson(env, action, bookId, system, user, schema, adminId, qualityContext = null) {
   if (!env.AI) {
     throw new Error('Workers AI binding is not configured on this Worker.');
   }
@@ -1027,12 +1027,19 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
           'Não trunques, encurtes ou substituas content por uma sinopse.',
           'Não uses markdown nem texto fora do JSON.',
         ].join(' ')
-      : [
-          'A saída deve ser completa e terminar correctamente.',
-          'Mantém cada campo textual curto e directo.',
-          'Não repitas informação em várias propriedades.',
-          'Não uses markdown nem texto fora do JSON.',
-        ].join(' ');
+      : action === 'story_bible'
+        ? [
+            'A saída deve ser JSON válida e completa.',
+            'A Bíblia deve ser densa em decisões concretas, não superficial.',
+            'Não uses placeholders nem filler.',
+            'Não uses markdown nem texto fora do JSON.',
+          ].join(' ')
+        : [
+            'A saída deve ser completa e terminar correctamente.',
+            'Mantém cada campo curto, concreto e útil para produção.',
+            'Não repitas informação em várias propriedades.',
+            'Não uses markdown nem texto fora do JSON.',
+          ].join(' ');
 
     let result;
     let response;
@@ -1052,6 +1059,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       response = validateAIResponse(
         action,
         parseAIJsonResponse(result),
+        qualityContext,
       );
     } catch (error) {
       firstError = error;
@@ -1089,6 +1097,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         response = validateAIResponse(
           action,
           parseAIJsonResponse(result),
+          qualityContext,
         );
       } catch (secondError) {
         firstError = secondError || firstError;
@@ -1120,8 +1129,10 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       const finalTokens = action === 'chapter'
         ? 8500
         : action === 'story_bible'
-          ? 6000
-          : 4500;
+          ? 8000
+          : action === 'structure'
+            ? 6000
+            : 4500;
 
       try {
         result = await aiRequest(
@@ -1415,8 +1426,8 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Official Story Bible Architect. Create the definitive creative canon from the author inputs only. Never write chapter prose. The Bible must be detailed enough that another writer can write the entire book without inventing canon. Preserve the exact title, premise, genre, series requirements and chapter-size requirements. Build: identity with title, genre, subgenre, logline, synopsis and format; story with central conflict, stakes, themes, beginning, inciting incident, midpoint, climax, resolution and protagonist arc; characters with stable ids, role, identity, wants, needs, flaw, arc, relationships and knowledge boundaries; relations; world with setting, time, culture, rules and limitations; timeline in causal order; style with POV, tense, voice, tone, pacing and dialogue guidance; continuity with immutable facts, must-not-change rules and unresolved threads; continuation with this book\'s ending plus future-safe series threads. Never invent a named place, person, object or rule that is not supported by the author premise or by another element of the Bible you are defining. Keep core fields concise, but complete. Maximum 8 characters, 12 relations and 12 timeline milestones. Return only JSON matching the schema.',
-      `${base}\n\nBook requirements:\n- Genre: ${context.genre || 'Not specified'}\n- Series name: ${context.series_name || 'Standalone'}\n- Series size: ${context.series_size || 'Not specified'}\n- Chapter size: ${context.chapter_size || context.desired_size || 'Not specified'}\n\nCreate the Official Story Bible now.`,
+      "You are the NexaurenBooks Chief Story-Bible Architect. Build a production-grade Official Story Bible, not a synopsis. It is the permanent creative canon for the entire book, detailed enough that another writer can draft every chapter without inventing canon. First decide the project's editorial scale from the actual story and store it in identity.editorial_scope with scale, character_count_target, relation_count_target, location_count_target, timeline_milestone_target and plot_thread_target. These are AI decisions, not fixed platform defaults; the character target may be 1 to 100 when genuinely justified, never as filler. Build identity with title, genre, subgenre, format, logline, synopsis and editorial_scope; story with premise, central_conflict, protagonist_goal, stakes, themes, beginning, inciting_incident, rising_action, midpoint, crisis, climax, resolution, protagonist_arc and ending; characters with stable id, real name, role, identity, background, wants, needs, fears, flaws, strengths, arc, relationships, knowledge_boundaries and relevant secrets; relations; world with concrete setting, time, culture, technology or speculative_element, explicit rules, limitations, key_locations, institutions, social_context and important_objects_or_systems; timeline in strict causal order with event, cause, consequence and important reveals; style with POV, tense, voice, tone, pacing, dialogue_guidance, description_guidance and scene_rules; continuity with immutable_facts, names_and_terms, must_not_change, knowledge_boundaries, forbidden_elements, unresolved_threads and reveal_rules; continuation with this_book_ending, future_threads and series_threads. Every decision must be specific to this story. Never use placeholders or filler such as 'Personagem 1', 'Cultura ocidental', 'Leis da física', 'Conclusão do projeto', 'Recursos limitados' or 'Presente' as actual answers. A role may be 'Protagonista', but the person must have a real name and complete identity. For science fiction, define a concrete speculative element and explicit rules; ordinary contemporary life is not enough. Do not write chapters and do not replace the Bible with a plot summary. Return only compact, information-dense JSON matching the schema.",
+      `${base}\n\nBook requirements:\n- Exact title: ${context.title || ''}\n- Premise: ${context.premise || context.description || ''}\n- Genre: ${context.genre || 'Not specified'}\n- Series name: ${context.series_name || 'Standalone'}\n- Series size: ${context.series_size || 'Not specified'}\n- Chapter size: ${context.chapter_size || context.desired_size || 'Not specified'}\n\nEditorial decision: choose the project scale yourself from the actual story. A simple story should stay compact; an epic story may legitimately require dozens or up to 100 characters. Also decide meaningful locations, relationships, timeline milestones and open plot threads. Counts must serve the narrative, not make the Bible look large.\n\nCreate the full Official Story Bible now.`,
       STORY_BIBLE_SCHEMA,
       admin.user_id,
     );
@@ -1430,6 +1441,14 @@ async function adminAI(request, env, admin) {
   if (action === 'approve_bible') {
     if (!context.story_bible) {
       return json({ error: 'Cria a Bíblia Oficial primeiro.' }, 400);
+    }
+
+    try {
+      validateAIResponse('story_bible', context.story_bible);
+    } catch {
+      return json({
+        error: 'A Bíblia Oficial ainda não está suficientemente completa para ser bloqueada. Gera uma nova versão antes de aprovar.',
+      }, 422);
     }
 
     await env.BOOKS_DB.prepare(
@@ -1458,10 +1477,11 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Editorial Structure Planner. Create the complete chapter map for this one book from the locked Story Bible. Use European Portuguese. Structure must follow causality: an event creates a consequence, which creates the next problem. Start with setup and inciting incident, build escalating complications and a meaningful midpoint, drive toward a climax, then resolve the central conflict and protagonist arc. For each chapter provide: arc_role, a concrete objective, only canon characters, canon location, concrete conflict, turning point, result, and cause_forward explaining what this chapter causes next. Titles must describe a specific story event rather than generic labels such as "A Verdade", "A Batalha" or "O Futuro". Do not introduce characters, locations, objects, powers, facts or relationships absent from the locked Bible. The final chapter must actually conclude this book unless the Bible explicitly says it is a continuation. Plan 12 chapters by default, maximum 16, unless the story clearly needs another count. Include only useful front/back matter. Keep each field to one short sentence. Never write chapter prose. Return only JSON matching the schema.',
-      `Book:\n${clip(base, 10000)}\n\nStory Bible:\n${clip(context.story_bible, 18000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 'AI may choose based on the story'}. Target chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}. Series size: ${context.book_metadata?.creation?.series_size || 'not specified'}. Create a concise editorial skeleton now.`,
+      "You are the NexaurenBooks Chief Editorial Structure Planner. Turn the locked Story Bible into the complete production blueprint for one finished book. Do not use a universal chapter count. Decide the chapter count from the Bible complexity, editorial scale, chapter-size target and series position. Store chapter_count, estimated_word_count, pacing_strategy and ending_strategy in book_plan. Use 6 to 40 chapters. Every chapter is a causal production unit with a concrete objective, canon characters, canon location, conflict, specific turning point, concrete result and the exact consequence that creates the next chapter. Use only canon people, locations, objects, technology, powers, rules, relationships and facts. Titles must identify specific story events or decisions, never generic labels. The opening establishes the story and inciting incident; the middle escalates consequences; the climax resolves the central conflict; the final chapter delivers the canon ending unless the Bible explicitly defines continuation. Front/back matter must be genuinely useful. This is a blueprint, never prose or fake chapter summaries. Return only compact, information-dense JSON matching the schema.",
+      `Book:\n${clip(base, 9000)}\n\nLOCKED STORY BIBLE:\n${clip(context.story_bible, 24000)}\n\nProduction constraints:\n- Chapter size: ${context.book_metadata?.creation?.chapter_size || 'not specified'}\n- Series: ${context.book_metadata?.creation?.series_name || 'Standalone'}\n- Series size: ${context.book_metadata?.creation?.series_size || 'not specified'}\n\nThe Bible's editorial scale and canon are authoritative. Decide the chapter count and create the complete chapter-by-chapter production blueprint now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
+      context.story_bible,
     );
     await saveOutline(env, bookId, structure);
     await env.BOOKS_DB.prepare(
