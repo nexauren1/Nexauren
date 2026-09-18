@@ -1683,15 +1683,43 @@ function wrapText(value, max = 88) {
   return lines;
 }
 
-function buildPdf(title, author, chapters) {
+function buildPdf(title, author, chapters, structure = null) {
   const pages = [];
-  let pageLines = [title, `By ${author}`, ''];
+  let pageLines = [title, `Por ${author}`, ''];
+  const normalized = structure && typeof structure === 'object'
+    ? structure : {};
+  const frontMatter = Array.isArray(normalized.front_matter)
+    ? normalized.front_matter.filter((item) => item?.included !== false)
+    : [];
+  const backMatter = Array.isArray(normalized.back_matter)
+    ? normalized.back_matter.filter((item) => item?.included !== false)
+    : [];
   const flush = () => {
     if (pageLines.length) pages.push([...pageLines]);
     pageLines = [];
   };
+  const addSection = (heading, content = '') => {
+    for (const line of ['', heading, '', ...wrapText(content, 92), '']) {
+      if (pageLines.length >= 47) flush();
+      pageLines.push(line);
+    }
+  };
+
+  for (const item of frontMatter) {
+    const type = String(item.type || '').toLowerCase();
+    const titleText = String(item.title || 'Secção inicial');
+    if (type.includes('contents') || type.includes('index') || titleText.toLowerCase() === 'índice') continue;
+    addSection(titleText, item.content || '');
+  }
+
+  if (chapters.length) {
+    addSection('Índice', chapters
+      .map((chapter) => `${chapter.chapter_number} · ${chapter.title || 'Sem título'}`)
+      .join('\n'));
+  }
+
   for (const chapter of chapters) {
-    const heading = `Chapter ${chapter.chapter_number}: ${chapter.title || ''}`.trim();
+    const heading = `Capítulo ${chapter.chapter_number}: ${chapter.title || ''}`.trim();
     const headingLines = wrapText(heading, 54);
     const bodyLines = String(chapter.content || '')
       .replace(/\r/g, '')
@@ -1705,10 +1733,13 @@ function buildPdf(title, author, chapters) {
       pageLines.push(line);
     }
   }
-  flush();
-  if (!pages.length) {
-    pages.push([title, `By ${author}`, '', 'This book is ready for content.']);
+
+  for (const item of backMatter) {
+    addSection(item.title || 'Secção final', item.content || '');
   }
+
+  flush();
+  if (!pages.length) pages.push([title, `Por ${author}`, '', 'O livro está pronto para receber conteúdo.']);
 
   const objects = ['', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
   const pageIds = [];
@@ -1832,12 +1863,9 @@ function zipStore(files) {
   return concatBytes([localData, centralData, end]);
 }
 
-function buildEpub(title, author, chapters) {
+function buildEpub(title, author, chapters, structure = null, language = 'pt-PT') {
   const files = [
-    {
-      name: 'mimetype',
-      data: 'application/epub+zip',
-    },
+    { name: 'mimetype', data: 'application/epub+zip' },
     {
       name: 'META-INF/container.xml',
       data: `<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`,
@@ -1845,12 +1873,20 @@ function buildEpub(title, author, chapters) {
   ];
   const manifest = [];
   const spine = [];
-  chapters.forEach((chapter, index) => {
-    const id = `chap${index + 1}`;
-    const filename = `chapter-${index + 1}.xhtml`;
+  const navItems = [];
+  const normalized = structure && typeof structure === 'object'
+    ? structure : {};
+  const frontMatter = Array.isArray(normalized.front_matter)
+    ? normalized.front_matter.filter((item) => item?.included !== false)
+    : [];
+  const backMatter = Array.isArray(normalized.back_matter)
+    ? normalized.back_matter.filter((item) => item?.included !== false)
+    : [];
+  const addXhtml = (id, filename, heading, content, navTitle) => {
     manifest.push(`<item id="${id}" href="${filename}" media-type="application/xhtml+xml"/>`);
     spine.push(`<itemref idref="${id}"/>`);
-    const paragraphs = String(chapter.content || '')
+    navItems.push(`<li><a href="${filename}">${xmlEscape(navTitle || heading)}</a></li>`);
+    const body = String(content || '')
       .split(/\n+/)
       .map((line) => line.trim())
       .filter(Boolean)
@@ -1858,16 +1894,53 @@ function buildEpub(title, author, chapters) {
       .join('');
     files.push({
       name: `OEBPS/${filename}`,
-      data: `<?xml version="1.0" encoding="UTF-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${xmlEscape(chapter.title || `Chapter ${chapter.chapter_number}`)}</title></head><body><h1>${xmlEscape(chapter.title || `Chapter ${chapter.chapter_number}`)}</h1>${paragraphs}</body></html>`,
+      data: `<?xml version="1.0" encoding="UTF-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${xmlEscape(heading)}</title></head><body><h1>${xmlEscape(heading)}</h1>${body}</body></html>`,
+    });
+  };
+
+  addXhtml('titlepage', 'title-page.xhtml', title, author, title);
+
+  frontMatter.forEach((item, index) => {
+    const type = String(item.type || '').toLowerCase();
+    const titleText = String(item.title || `Secção inicial ${index + 1}`);
+    if (type.includes('contents') || type.includes('index') || titleText.toLowerCase() === 'índice') return;
+    addXhtml(`front${index + 1}`, `front-${index + 1}.xhtml`, titleText, item.content || '', titleText);
+  });
+
+  addXhtml('contents', 'contents.xhtml', 'Índice', chapters
+    .map((chapter) => `${chapter.chapter_number} · ${chapter.title || 'Sem título'}`)
+    .join('\n'), 'Índice');
+
+  chapters.forEach((chapter, index) => {
+    const id = `chap${index + 1}`;
+    const filename = `chapter-${index + 1}.xhtml`;
+    const body = String(chapter.content || '')
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => `<p>${xmlEscape(line)}</p>`)
+      .join('');
+    manifest.push(`<item id="${id}" href="${filename}" media-type="application/xhtml+xml"/>`);
+    spine.push(`<itemref idref="${id}"/>`);
+    navItems.push(`<li><a href="${filename}">Capítulo ${chapter.chapter_number}: ${xmlEscape(chapter.title || 'Sem título')}</a></li>`);
+    files.push({
+      name: `OEBPS/${filename}`,
+      data: `<?xml version="1.0" encoding="UTF-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${xmlEscape(chapter.title || `Capítulo ${chapter.chapter_number}`)}</title></head><body><h1>Capítulo ${xmlEscape(chapter.chapter_number)} · ${xmlEscape(chapter.title || 'Sem título')}</h1>${body}</body></html>`,
     });
   });
+
+  backMatter.forEach((item, index) => {
+    const titleText = String(item.title || `Secção final ${index + 1}`);
+    addXhtml(`back${index + 1}`, `back-${index + 1}.xhtml`, titleText, item.content || '', titleText);
+  });
+
   files.push({
     name: 'OEBPS/nav.xhtml',
-    data: `<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Contents</title></head><body><nav epub:type="toc"><ol>${chapters.map((chapter, index) => `<li><a href="chapter-${index + 1}.xhtml">${xmlEscape(chapter.title || `Chapter ${chapter.chapter_number}`)}</a></li>`).join('')}</ol></nav></body></html>`,
+    data: `<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Índice</title></head><body><nav epub:type="toc"><ol>${navItems.join('')}</ol></nav></body></html>`,
   });
   files.push({
     name: 'OEBPS/content.opf',
-    data: `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">nexauren:${slugify(title)}-${slugify(author)}</dc:identifier><dc:title>${xmlEscape(title)}</dc:title><dc:creator>${xmlEscape(author)}</dc:creator><dc:language>en</dc:language></metadata><manifest>${manifest.join('')}<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/></manifest><spine>${spine.join('')}</spine></package>`,
+    data: `<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">nexauren:${slugify(title)}-${slugify(author)}</dc:identifier><dc:title>${xmlEscape(title)}</dc:title><dc:creator>${xmlEscape(author)}</dc:creator><dc:language>${xmlEscape(language || 'pt-PT')}</dc:language></metadata><manifest>${manifest.join('')}<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/></manifest><spine>${spine.join('')}</spine></package>`,
   });
   return zipStore(files);
 }
@@ -1984,10 +2057,18 @@ async function publicBooksApi(request, env) {
     const chapters = (await getBookChapters(env, book.id))
       .filter((item) => Number(item.is_current) === 1)
       .sort((a, b) => Number(a.chapter_number) - Number(b.chapter_number));
+    const bookContext = await getBook(env, book.id);
+    const structure = bookContext?.story_bible?.outline || null;
     const filename = `${slugify(book.title) || 'nexauren-book'}.${format}`;
     const bytes = format === 'pdf'
-      ? buildPdf(book.title, book.author, chapters)
-      : buildEpub(book.title, book.author, chapters);
+      ? buildPdf(book.title, book.author, chapters, structure)
+      : buildEpub(
+          book.title,
+          book.author,
+          chapters,
+          structure,
+          book.language || 'pt-PT',
+        );
     await env.BOOKS_DB.prepare(
       `INSERT INTO download_logs
         (id, book_id, user_id, format, created_at)
