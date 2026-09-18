@@ -622,6 +622,26 @@ function parseAIJsonResponse(result) {
   );
 }
 
+function friendlyAIError(error) {
+  const message = String(error?.message || error || '').trim();
+
+  if (/json|unterminated|string/i.test(message)) {
+    return new Error(
+      'A IA não conseguiu concluir esta etapa correctamente. Tenta novamente.',
+    );
+  }
+
+  if (/timeout|timed out|deadline|busy|overloaded|rate limit|429/i.test(message)) {
+    return new Error(
+      'A IA está temporariamente ocupada. Tenta novamente dentro de alguns segundos.',
+    );
+  }
+
+  return new Error(
+    'Não foi possível concluir esta etapa com a IA agora. Tenta novamente.',
+  );
+}
+
 async function runAIJson(env, action, bookId, system, user, schema, adminId) {
   if (!env.AI) {
     throw new Error('Workers AI binding is not configured on this Worker.');
@@ -637,26 +657,31 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
   ).bind(jobId, bookId || null, action, TEXT_MODEL, started, adminId).run();
 
   try {
-    const aiRequest = (systemPrompt, userPrompt) => env.AI.run(
+    const aiRequest = (systemPrompt, userPrompt, structured = true) => env.AI.run(
       TEXT_MODEL,
       {
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: schema,
-        },
-        max_tokens: 8192,
+        response_format: structured
+          ? {
+              type: 'json_schema',
+              json_schema: schema,
+            }
+          : {
+              type: 'json_object',
+            },
+        max_tokens: 10000,
         temperature: 0.1,
       },
     );
 
-    let result = await aiRequest(system, user);
+    let result;
     let response;
 
     try {
+      result = await aiRequest(system, user, true);
       response = parseAIJsonResponse(result);
     } catch (firstError) {
       const retrySystem = [
@@ -666,7 +691,7 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         'Gere novamente desde o início.',
         'Devolva APENAS um JSON válido e completo.',
         'Não uses markdown, comentários ou texto fora do JSON.',
-        'Mantém os textos curtos para garantir que todo o JSON termina corretamente.',
+        'Mantém os textos curtos para garantir que todo o JSON termina correctamente.',
         'Não uses aspas duplas dentro de valores de texto sem as escapar.',
       ].join('\\n');
 
@@ -676,11 +701,11 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
         'RETRY: responde novamente com JSON completo, compacto e válido.',
       ].join('\\n');
 
-      result = await aiRequest(retrySystem, retryUser);
       try {
+        result = await aiRequest(retrySystem, retryUser, false);
         response = parseAIJsonResponse(result);
-      } catch {
-        throw firstError;
+      } catch (secondError) {
+        throw friendlyAIError(secondError || firstError);
       }
     }
 
@@ -713,12 +738,15 @@ async function runAIJson(env, action, bookId, system, user, schema, adminId) {
       `UPDATE ai_jobs
           SET status = 'failed', completed_at = ?, error = ?
         WHERE id = ?`,
-    ).bind(now(), String(error?.message || error), jobId).run();
+    ).bind(
+      now(),
+      String(error?.message || error),
+      jobId,
+    ).run();
 
     throw error;
   }
 }
-
 async function saveResearch(env, bookId, report) {
   await env.BOOKS_DB.prepare(
     `INSERT INTO research_notes
