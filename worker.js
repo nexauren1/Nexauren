@@ -4,6 +4,7 @@ const PASSWORD_ITERATIONS = 30000;
 const TEXT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
+const BOOKS_STUDIO_VERSION = '2026-09-18-bible-v4';
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -2516,6 +2517,12 @@ async function adminApi(request, env) {
         external_object_storage_required: false,
         formats: ['PDF', 'EPUB'],
       },
+      books_studio: {
+        version: BOOKS_STUDIO_VERSION,
+        bible_quality_gate: true,
+        sequential_writing: true,
+        pdf_generation: true,
+      },
     });
   }
 
@@ -3390,6 +3397,7 @@ async function api(request, env) {
       return json({
         ok: true,
         service: 'nexauren',
+        books_studio_version: BOOKS_STUDIO_VERSION,
         time: new Date().toISOString(),
         ai: Boolean(env.AI),
       });
