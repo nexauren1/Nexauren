@@ -943,8 +943,8 @@ async function adminAI(request, env, admin) {
       env,
       action,
       bookId,
-      'You are the NexaurenBooks Editorial Structure Planner. Build a complete practical book structure from the Story Bible using European Portuguese. Always return these opening elements as included=true for a normal book: title page, copyright page, dedication, presentation, preface and introduction. Also return an epigraph entry as included=true when the story benefits from one. Return a contents/index entry with included=true, but its content must be empty because the system creates it from the chapter list. Then return every planned chapter with a stable number, a specific title, an objective, characters, location, conflict and result. Finally return useful closing elements such as acknowledgements or an author note when appropriate. The structure must be coherent and ready for PDF and EPUB. Never contradict locked canon. Return only JSON matching the schema.',
-      `Book:\n${clip(base, 14000)}\n\nStory Bible:\n${clip(context.story_bible, 30000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Create the editorial structure now.`,
+      'You are the NexaurenBooks Editorial Structure Planner. Create only the editorial skeleton. Use European Portuguese. Keep every text field very short. The system will generate full chapter content later. Return valid JSON only. Include title page, copyright page, dedication, presentation, preface, introduction, contents, chapters, and useful closing elements. For front/back matter, content should normally be empty. For each chapter return a short specific title, objective, character names, location, conflict and result. Never write long paragraphs.',
+      `Book:\n${clip(base, 10000)}\n\nStory Bible:\n${clip(context.story_bible, 18000)}\n\nRequested approximate chapter count: ${context.approx_chapter_count || 0}. Create a concise editorial skeleton now.`,
       OUTLINE_SCHEMA,
       admin.user_id,
     );
