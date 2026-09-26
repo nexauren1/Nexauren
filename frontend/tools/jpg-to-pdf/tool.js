@@ -136,7 +136,7 @@ function buildPdf(images){
     const imageId = nextId++;
     const contentId = nextId++;
     const pageId = nextId++;
-    const {width: iw, height: ih, data} = image;
+    const {width: iw, height: ih, components, data} = image;
     let pageW, pageH, drawW, drawH, x, y;
 
     if(pageSize.value === 'a4'){
@@ -201,7 +201,7 @@ convertButton.addEventListener('click', async ()=>{
       status.textContent = 'A processar ' + (i+1) + ' de ' + files.length + '…';
       const data = await blobBytes(files[i]);
       const info = jpegInfo(data);
-      images.push({data,width:info.width,height:info.height});
+      images.push({data,width:info.width,height:info.height,components:info.components});
     }
     const pdf = buildPdf(images);
     const blob = new Blob([pdf],{type:'application/pdf'});
