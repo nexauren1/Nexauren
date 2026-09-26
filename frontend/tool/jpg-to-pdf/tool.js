@@ -17,7 +17,7 @@
 
   const t = {
     pt: {
-      menu:"Menu", home:"Início", tools:"Ferramentas", account:"Conta", pdf:"PDF",
+      menu:"Menu", home:"Início", tools:"Ferramentas", account:"Conta", pdf:"PDF", translate:"Traduzir",
       title:"JPG → PDF",
       lead:"Converta uma ou várias imagens JPG/JPEG num único PDF diretamente no navegador.",
       addTitle:"Adicione as suas imagens", dropText:"Arraste e solte aqui ou escolha arquivos do dispositivo.",
@@ -35,7 +35,7 @@
       remove:"Remover"
     },
     en: {
-      menu:"Menu", home:"Home", tools:"Tools", account:"Account", pdf:"PDF",
+      menu:"Menu", home:"Home", tools:"Tools", account:"Account", pdf:"PDF", translate:"Translate",
       title:"JPG → PDF",
       lead:"Convert one or more JPG/JPEG images into a single PDF directly in your browser.",
       addTitle:"Add your images", dropText:"Drag and drop here or choose files from your device.",
@@ -74,6 +74,7 @@
       const key = node.dataset.i18nPlaceholder;
       if (t[lang][key] != null) node.placeholder = t[lang][key];
     });
+    document.getElementById("translate-label").textContent = t[lang].translate;
     document.getElementById("lang-pt").classList.toggle("active", lang === "pt");
     document.getElementById("lang-en").classList.toggle("active", lang === "en");
     document.title = "JPG → PDF — Nexauren Tools";
