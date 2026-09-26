@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ferramentas online da Nexauren.">
+  <title>Nexauren Tools</title>
+  <link rel="stylesheet" href="/tool/styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="shell nav">
+    <a class="brand" href="/"><span class="brand-mark">N</span><span>NEXAUREN TOOLS</span></a>
+    <button id="tool-menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="tool-nav"><span></span><span></span><span></span><span class="sr-only">Menu</span></button>
+    <nav id="tool-nav" class="primary-nav" aria-label="Navegação">
+      <a href="/">Início</a><a href="/blog/">Blog</a><a href="/tool/">Ferramentas</a><a class="account-link" href="/account/">Conta</a>
+      <span class="language-switch" aria-label="Idioma">
+        <button class="lang-button" type="button" data-lang-button="pt">PT</button>
+        <button class="lang-button" type="button" data-lang-button="en">EN</button>
+      </span>
+    </nav>
+  </div>
+</header>
+<main>
+  <section class="shell hero">
+    <p class="eyebrow" data-i18n="eyebrow">NEXAUREN TOOLS</p>
+    <h1 data-i18n="heading">Ferramentas que acompanham o seu trabalho.</h1>
+    <p class="hero-text" data-i18n="description">Pequenos utilitários para escrever, calcular, organizar e criar. Rápidos no telemóvel, simples no computador e preparados para crescer.</p>
+    <label class="search-box" for="tool-search"><span aria-hidden="true">⌕</span><span class="sr-only" data-i18n="searchLabel">Pesquisar ferramentas ou categorias</span><input id="tool-search" type="search" placeholder="Pesquisar ferramentas ou categorias…" autocomplete="off"></label>
+  </section>
+  <section class="shell section" aria-labelledby="categories-title">
+    <div class="section-head"><div><p class="eyebrow" data-i18n="eyebrow">NEXAUREN TOOLS</p><h2 id="categories-title" data-i18n="categories">Categorias</h2></div><p data-i18n="categoriesSub">Escolha uma categoria para ver as ferramentas disponíveis.</p></div>
+    <div id="category-grid" class="category-grid"></div>
+  </section>
+  <section class="shell section" aria-labelledby="tools-title">
+    <div class="section-head"><div><p class="eyebrow" data-i18n="eyebrow">NEXAUREN TOOLS</p><h2 id="tools-title" data-i18n="tools">Catálogo Nexauren</h2></div><p data-i18n="toolsSub">Ferramentas publicadas e descobertas automaticamente pelo catálogo.</p></div>
+    <div id="tool-grid" class="tool-grid"></div>
+  </section>
+</main>
+<footer class="site-footer"><div class="shell footer-row"><span data-i18n="footer">Nexauren Tools · ferramentas rápidas no navegador.</span><span>© Nexauren</span></div></footer>
+<script src="/tool/data/tools.js"></script>
+<script src="/tool/catalog.js" defer></script>
+</body>
+</html>
