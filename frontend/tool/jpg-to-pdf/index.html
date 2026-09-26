@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Converta JPG e JPEG em PDF com a Nexauren Tools.">
+  <title>JPG → PDF — Nexauren Tools</title>
+  <link rel="stylesheet" href="/tool/styles.css">
+  <link rel="stylesheet" href="/tool/jpg-to-pdf/tool.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="shell nav">
+    <a class="brand" href="/tool/"><span class="brand-mark">N</span><span>NEXAUREN TOOLS</span></a>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"><span></span><span></span><span></span><span class="sr-only" data-i18n="menu">Menu</span></button>
+    <nav id="main-nav" class="primary-nav" aria-label="Navegação">
+      <a href="/" data-i18n="home">Início</a><a href="/blog/">Blog</a><a href="/tool/" data-i18n="tools">Ferramentas</a><a href="/account/" data-i18n="account">Conta</a>
+      <span class="language-switch">
+        <button id="lang-pt" class="lang-button" type="button">PT</button>
+        <button id="lang-en" class="lang-button" type="button">EN</button>
+      </span>
+    </nav>
+  </div>
+</header>
+<main class="shell tool-main">
+  <div class="breadcrumb"><a href="/tool/" data-i18n="tools">Ferramentas</a><span>›</span><a href="/tool/pdf/" data-i18n="pdf">PDF</a><span>›</span><span>JPG → PDF</span></div>
+  <section class="tool-hero">
+    <p class="eyebrow">NEXAUREN TOOLS · PDF</p>
+    <h1 data-i18n="title">JPG → PDF</h1>
+    <p class="tool-lead" data-i18n="lead">Converta uma ou várias imagens JPG/JPEG num único PDF diretamente no navegador.</p>
+  </section>
+  <section class="workspace" aria-label="JPG → PDF">
+    <div id="drop-zone" class="drop-zone" tabindex="0" role="button">
+      <div class="drop-icon">JPG</div>
+      <h2 data-i18n="addTitle">Adicione as suas imagens</h2>
+      <p data-i18n="dropText">Arraste e solte aqui ou escolha arquivos do dispositivo.</p>
+      <label class="primary-button"><span data-i18n="choose">Selecionar JPG</span><input id="file-input" type="file" accept=".jpg,.jpeg,image/jpeg" multiple hidden></label>
+      <small data-i18n="hint">JPG/JPEG · várias imagens permitidas · processamento local</small>
+    </div>
+    <div id="file-panel" class="file-panel" hidden>
+      <div class="panel-head"><div><span class="panel-kicker" data-i18n="files">ARQUIVOS</span><h2 id="file-count">0</h2></div><button id="clear-button" class="ghost-button" type="button" data-i18n="clear">Limpar</button></div>
+      <div id="file-list" class="file-list"></div>
+      <div class="options">
+        <label><span data-i18n="filename">Nome do PDF</span><input id="output-name" type="text" value="nexauren-jpg.pdf" maxlength="120" autocomplete="off"></label>
+        <label><span data-i18n="pageSize">Tamanho da página</span><select id="page-size"><option value="fit" data-i18n="fit">Ajustar à imagem</option><option value="a4" data-i18n="a4">A4</option></select></label>
+      </div>
+      <button id="convert-button" class="convert-button" type="button" data-i18n="convert">Criar PDF</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+  <section class="info-grid">
+    <article><strong data-i18n="privateTitle">Privado</strong><span data-i18n="privateText">As imagens não precisam de ser enviadas para um servidor.</span></article>
+    <article><strong data-i18n="multiTitle">Várias imagens</strong><span data-i18n="multiText">Organize várias páginas num único documento.</span></article>
+    <article><strong data-i18n="fastTitle">Rápido</strong><span data-i18n="fastText">Ideal para documentos simples, digitalizações e anexos.</span></article>
+  </section>
+</main>
+<footer class="site-footer"><div class="shell footer-row"><span data-i18n="footer">Nexauren Tools · JPG → PDF</span><span>© Nexauren</span></div></footer>
+<script src="/tool/jpg-to-pdf/tool.js" defer></script>
+</body>
+</html>
