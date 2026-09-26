@@ -15,6 +15,10 @@ Nexauren is one platform with separate public experiences:
 
 The public experiences keep their own navigation and content. Admin is never linked from the public interface.
 
+## Tools development rules
+
+The official creation and publication rules for Nexauren Tools are documented in [`docs/TOOLS_RULES.md`](docs/TOOLS_RULES.md). Any new tool must follow that document before implementation or publication.
+
 ## Cloudflare Worker
 
 `worker.js` is the server layer for authentication, sessions, admin authorization, Books APIs and PayPal Checkout.
