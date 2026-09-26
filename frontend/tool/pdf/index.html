@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Ferramentas PDF da Nexauren.">
+  <title>PDF — Nexauren Tools</title>
+  <link rel="stylesheet" href="/tool/styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="shell nav">
+    <a class="brand" href="/tool/"><span class="brand-mark">N</span><span>NEXAUREN TOOLS</span></a>
+    <nav class="primary-nav" style="position:static;display:flex">
+      <a href="/tool/">Ferramentas</a><a href="/blog/">Blog</a><a href="/account/">Conta</a>
+      <span class="language-switch"><button class="lang-button active" id="pt" type="button">PT</button><button class="lang-button" id="en" type="button">EN</button></span>
+    </nav>
+  </div>
+</header>
+<main class="shell hero">
+  <div class="breadcrumb"><a href="/tool/">Ferramentas</a><span>›</span><span>PDF</span></div>
+  <p class="eyebrow">NEXAUREN TOOLS · PDF</p>
+  <h1 id="title">Ferramentas PDF.</h1>
+  <p class="hero-text" id="description">Conversão, organização e utilitários para trabalhar com documentos PDF.</p>
+</main>
+<section class="shell section">
+  <div id="pdf-tools" class="tool-grid"></div>
+</section>
+<footer class="site-footer"><div class="shell footer-row"><span id="footer">Nexauren Tools · PDF</span><span>© Nexauren</span></div></footer>
+<script src="/tool/data/tools.js"></script>
+<script>
+(() => {
+  const data = window.NEXAUREN_TOOL_DATA || {categories:[],tools:[]};
+  const langKey = "nexauren-tools-language";
+  let lang = localStorage.getItem(langKey) === "en" ? "en" : "pt";
+  const category = data.categories.find((item) => item.slug === "pdf");
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  const getText = (value) => value?.[lang] || value?.pt || value?.en || "";
+  const render = () => {
+    document.documentElement.lang = lang;
+    document.getElementById("pt").classList.toggle("active", lang === "pt");
+    document.getElementById("en").classList.toggle("active", lang === "en");
+    document.getElementById("title").textContent = lang === "pt" ? "Ferramentas PDF." : "PDF tools.";
+    document.getElementById("description").textContent = getText(category?.description);
+    document.getElementById("footer").textContent = lang === "pt" ? "Nexauren Tools · PDF" : "Nexauren Tools · PDF";
+    document.getElementById("pdf-tools").innerHTML = data.tools.filter((tool) => tool.status === "published" && tool.category === "pdf").map((tool) =>
+      '<article class="tool-card"><div class="tool-card-head"><div class="card-icon">' + escapeHtml(tool.icon) + '</div><span class="badge free">FREE</span></div><h3>' + escapeHtml(getText(tool.title)) + '</h3><p>' + escapeHtml(getText(tool.description)) + '</p><div class="tool-actions"><a class="tool-button" href="' + escapeHtml(tool.route) + '">' + (lang === "pt" ? "Abrir ferramenta" : "Open tool") + ' →</a></div></article>'
+    ).join("") || '<div class="state">' + (lang === "pt" ? "Nenhuma ferramenta publicada." : "No published tools.") + '</div>';
+  };
+  document.getElementById("pt").addEventListener("click",()=>{lang="pt";localStorage.setItem(langKey,lang);render();});
+  document.getElementById("en").addEventListener("click",()=>{lang="en";localStorage.setItem(langKey,lang);render();});
+  render();
+})();
+</script>
+</body>
+</html>
