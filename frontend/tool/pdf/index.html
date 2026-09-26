@@ -10,9 +10,10 @@
 <header class="site-header">
   <div class="shell nav">
     <a class="brand" href="/tool/"><span class="brand-mark">N</span><span>NEXAUREN TOOLS</span></a>
-    <nav class="primary-nav" style="position:static;display:flex">
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav"><span></span><span></span><span></span><span class="sr-only">Menu</span></button>
+    <nav id="main-nav" class="primary-nav" aria-label="Navegação">
       <a href="/tool/">Ferramentas</a><a href="/blog/">Blog</a><a href="/account/">Conta</a>
-      <span class="language-switch"><button class="lang-button active" id="pt" type="button">PT</button><button class="lang-button" id="en" type="button">EN</button></span>
+      <span class="language-switch"><span id="translate-label" class="lang-label">Traduzir</span><button class="lang-button active" id="pt" type="button" aria-label="Traduzir para português">PT</button><button class="lang-button" id="en" type="button" aria-label="Translate to English">EN</button></span>
     </nav>
   </div>
 </header>
@@ -38,6 +39,7 @@
   const render = () => {
     document.documentElement.lang = lang;
     document.getElementById("pt").classList.toggle("active", lang === "pt");
+    document.getElementById("translate-label").textContent = lang === "pt" ? "Traduzir" : "Translate";
     document.getElementById("en").classList.toggle("active", lang === "en");
     document.getElementById("title").textContent = lang === "pt" ? "Ferramentas PDF." : "PDF tools.";
     document.getElementById("description").textContent = getText(category?.description);
@@ -48,6 +50,9 @@
   };
   document.getElementById("pt").addEventListener("click",()=>{lang="pt";localStorage.setItem(langKey,lang);render();});
   document.getElementById("en").addEventListener("click",()=>{lang="en";localStorage.setItem(langKey,lang);render();});
+  const toggle=document.getElementById("menu-toggle"), nav=document.getElementById("main-nav");
+  toggle.addEventListener("click",()=>{const open=toggle.getAttribute("aria-expanded")==="true";toggle.setAttribute("aria-expanded",String(!open));nav.classList.toggle("is-open",!open);});
+  nav.querySelectorAll("a").forEach((link)=>link.addEventListener("click",()=>{toggle.setAttribute("aria-expanded","false");nav.classList.remove("is-open");}));
   render();
 })();
 </script>
