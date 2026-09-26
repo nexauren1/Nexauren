@@ -6,7 +6,7 @@ Este documento é a regra de referência para criar, publicar, atualizar ou remo
 
 As regras desta documentação aplicam-se exclusivamente ao sistema **Nexauren Tools**.
 
-A área **Blog é intocável** durante qualquer trabalho de criação ou manutenção de ferramentas. Nenhuma ferramenta, migração, CSS, JavaScript, rota ou API de Tools pode alterar comportamento, conteúdo, estilos, estrutura ou dados de `blog_posts` sem uma tarefa específica e separada para o Blog.
+A área **Blog é intocável** durante qualquer trabalho de criação ou manutenção de ferramentas. Nenhuma ferramenta, migration, CSS, JavaScript, rota ou API de Tools pode alterar comportamento, conteúdo, estilos, estrutura ou dados de `blog_posts` sem uma tarefa específica e separada para o Blog.
 
 ## 2. Uma ferramenta é um produto funcional, não apenas um card
 
@@ -140,13 +140,11 @@ com os campos necessários para título e rota e, quando aplicável:
 
 A ferramenta deve começar em estado `draft` até estar pronta para publicação.
 
-## 12. Banco de dados
+## 12. Dados do catálogo
 
-A tabela `tools` é a fonte oficial de metadados do catálogo.
+O registo público das ferramentas deve ficar em `frontend/tool/data/tools.js`, que é a fonte oficial do catálogo estático e das categorias.
 
-A estrutura atualmente existente deve ser respeitada, e qualquer novo atributo estrutural necessário para o sistema de Tools deve ser introduzido por migração versionada.
-
-Não criar tabelas paralelas para o mesmo catálogo sem uma decisão arquitetural explícita.
+**Nunca criar migrations para adicionar ferramentas ou categorias.** Não criar tabelas paralelas nem ficheiros SQL para o catálogo de Tools. Uma nova categoria é criada adicionando um objeto de categoria ao catálogo de dados e associando a ferramenta ao seu `category`.
 
 ## 13. Performance
 
@@ -189,7 +187,7 @@ Antes de mudar uma ferramenta para `published`, verificar:
 - a rota abre diretamente;
 - a função principal funciona;
 - a ferramenta aparece no catálogo;
-- a categoria aparece corretamente;
+- a categoria aparece corretamente a partir do `data`;
 - a pesquisa encontra a ferramenta;
 - o cache continua funcional;
 - o estado Free/Pro está correto;
