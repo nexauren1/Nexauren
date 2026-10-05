@@ -1,3 +1,4 @@
+import { provisionMusicPlayerPayPal } from './paypal-provision.js';
 import worker from './worker.js';
 
 const SESSION_COOKIE = '__Host-nexauren_session';
@@ -151,6 +152,19 @@ export default {
       return json({
         error: 'Internal server error.',
       }, 500);
+    }
+  },
+
+  async scheduled(controller, env, ctx) {
+    if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_CLIENT_SECRET) return;
+
+    try {
+      await provisionMusicPlayerPayPal(env);
+    } catch (error) {
+      console.error(
+        'Scheduled Music Player PayPal provisioning failed:',
+        error,
+      );
     }
   },
 };
