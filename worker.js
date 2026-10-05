@@ -1,3 +1,5 @@
+import { provisionMusicPlayerPayPal } from './paypal-provision.js';
+
 const SESSION_COOKIE = '__Host-nexauren_session';
 const SESSION_DAYS = 14;
 const PASSWORD_ITERATIONS = 30000;
@@ -3529,6 +3531,24 @@ async function publicBooksApi(request, env) {
 async function paypalApi(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
+
+  if (
+    path === '/api/paypal/music-player/provision'
+    && request.method === 'POST'
+  ) {
+    const admin = await requireAdmin(env, request);
+    if (!admin) return json({ error: 'Admin access required.' }, 403);
+
+    try {
+      return json(await provisionMusicPlayerPayPal(env));
+    } catch (error) {
+      console.error('Music Player PayPal provisioning failed:', error);
+      return json({
+        error: error?.message || 'PayPal provisioning failed.',
+      }, 502);
+    }
+  }
+
   if (path === '/api/paypal/config' && request.method === 'GET') {
     return json({
       configured: Boolean(env.PAYPAL_CLIENT_ID && env.PAYPAL_CLIENT_SECRET),
@@ -3536,6 +3556,7 @@ async function paypalApi(request, env) {
       environment: env.PAYPAL_ENVIRONMENT || 'sandbox',
     });
   }
+
   return json({ error: 'PayPal is not configured for this action yet.' }, 503);
 }
 
