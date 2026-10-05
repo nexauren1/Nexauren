@@ -27,5 +27,10 @@
       "database_id": "887e6775-e3ad-43a6-b315-8193f7c6c346",
       "migrations_dir": "migrations/books"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "0 */6 * * *"
+    ]
+  }
 }
